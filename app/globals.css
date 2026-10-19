@@ -1,0 +1,156 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-figtree), sans-serif;
+  --font-serif: var(--font-cinzel), serif;
+  --color-ink: #f5f0e6;
+  --color-panel: #141414;
+  --color-panel-2: #1c1c1c;
+  --color-line: #2c2c2c;
+  --color-cream: #f8f1e3;
+  --color-sand: #b8b0a4;
+  --color-coral: #d4af37;
+  --color-coral-2: #f0d78c;
+  --color-gold: #d4af37;
+  --color-gold-2: #f0d78c;
+  --color-mint: #3ecf8e;
+  --color-muted: #8a847a;
+  --color-paper: #050505;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  overscroll-behavior: none;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: #050505;
+  color: #f5f0e6;
+  font-family: var(--font-figtree), sans-serif;
+}
+
+button, input, textarea { font-family: inherit; }
+
+button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+
+input, textarea, select {
+  color: #f5f0e6;
+  font-size: 16px;
+}
+
+::selection { background: rgba(212, 175, 55, 0.28); }
+
+input[type="range"] { accent-color: #d4af37; }
+
+.app-scroll { scrollbar-width: thin; scrollbar-color: #2c2c2c transparent; }
+
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+.chat-bg { background: #0b0b0b; }
+
+.gold-fill {
+  background: linear-gradient(135deg, #f0d78c 0%, #d4af37 45%, #a67c00 100%);
+  color: #120e05;
+}
+
+.gold-text {
+  background: linear-gradient(135deg, #f8e7b0, #d4af37 50%, #a67c00);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.gold-border {
+  border: 1px solid rgba(212, 175, 55, 0.55);
+}
+
+.stamp {
+  border: 3px solid currentColor;
+  border-radius: 10px;
+  background: rgba(10, 10, 10, 0.82);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 6px 10px;
+}
+
+@keyframes pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  40% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.heart-pop { animation: pop 0.45s ease both; }
+
+@keyframes splash-in {
+  0% { opacity: 0; transform: scale(0.88); filter: blur(8px); }
+  55% { opacity: 1; transform: scale(1.03); filter: blur(0); }
+  100% { opacity: 1; transform: scale(1); filter: blur(0); }
+}
+
+@keyframes splash-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+}
+
+@keyframes splash-glow {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 0.55; }
+}
+
+@keyframes splash-bar {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(220%); }
+}
+
+@keyframes splash-fade {
+  to { opacity: 0; visibility: hidden; }
+}
+
+.splash-screen {
+  transition: opacity 0.45s ease, visibility 0.45s ease;
+}
+
+.splash-screen.splash-out {
+  animation: splash-fade 0.45s ease forwards;
+  pointer-events: none;
+}
+
+.splash-glow {
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(212, 175, 55, 0.22), transparent 58%),
+    radial-gradient(ellipse at 50% 70%, rgba(166, 124, 0, 0.12), transparent 50%);
+  animation: splash-glow 2.4s ease-in-out infinite;
+}
+
+.splash-mark {
+  animation:
+    splash-in 0.85s cubic-bezier(0.2, 0.85, 0.25, 1) both,
+    splash-pulse 2.2s ease-in-out 0.85s infinite;
+}
+
+.splash-bar-fill {
+  animation: splash-bar 1.15s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .heart-pop { animation: none; }
+  .splash-glow,
+  .splash-mark,
+  .splash-bar-fill,
+  .splash-screen.splash-out {
+    animation: none;
+  }
+  .splash-screen.splash-out {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
