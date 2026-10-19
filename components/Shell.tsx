@@ -2,17 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { IconChat, IconClapper, IconHome, IconMatch, IconUser } from "./Icons";
+import { IconChat, IconClapper, IconMatch, IconUser } from "./Icons";
 import { MatchModal } from "./MatchModal";
 import { Logo } from "./Logo";
 import { Splash } from "./Splash";
 import { registerServiceWorker } from "@/lib/notify";
 import { useFecon } from "@/lib/store";
 
+/** Fluxo do usuário final: vídeo → match → chat → eu */
 const nav = [
-  { href: "/inicio", label: "Início", icon: IconHome },
-  { href: "/descobrir", label: "Match", icon: IconMatch },
   { href: "/reels", label: "Reels", icon: IconClapper },
+  { href: "/descobrir", label: "Match", icon: IconMatch },
   { href: "/matches", label: "Chat", icon: IconChat },
   { href: "/perfil", label: "Perfil", icon: IconUser },
 ];
@@ -46,10 +46,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
       router.replace("/");
       return;
     }
-    if (me && pathname === "/") {
+    if (me && (pathname === "/" || pathname === "/inicio")) {
       router.replace("/reels");
       const timer = window.setTimeout(() => {
-        if (window.location.pathname === "/") {
+        if (window.location.pathname === "/" || window.location.pathname === "/inicio") {
           window.location.replace("/reels");
         }
       }, 700);
@@ -99,10 +99,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         <aside className="hidden w-[92px] shrink-0 flex-col items-center gap-2 border-r border-line bg-black py-5 md:flex">
           <Logo size="sm" mark />
           {nav.map((item) => {
-            const active =
-              pathname === item.href ||
-              (item.href === "/matches" && isChat) ||
-              (item.href === "/inicio" && pathname === "/inicio");
+            const active = pathname === item.href || (item.href === "/matches" && isChat);
             const Icon = item.icon;
             return (
               <button
@@ -128,7 +125,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col bg-paper">
         <div className="min-h-0 flex-1">{children}</div>
         {showNav && !hideBottom && (
-          <nav className="grid h-[calc(62px+env(safe-area-inset-bottom))] grid-cols-5 border-t border-line bg-black px-1 pt-1.5 pb-[env(safe-area-inset-bottom)] md:hidden">
+          <nav className="grid h-[calc(62px+env(safe-area-inset-bottom))] grid-cols-4 border-t border-line bg-black px-1 pt-1.5 pb-[env(safe-area-inset-bottom)] md:hidden">
             {nav.map((item) => {
               const active = pathname === item.href || (item.href === "/matches" && isChat);
               const Icon = item.icon;

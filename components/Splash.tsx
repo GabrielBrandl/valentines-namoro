@@ -13,7 +13,7 @@ export function Splash({ fading = false }: { fading?: boolean }) {
       <div className="splash-glow pointer-events-none absolute inset-0" />
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/splash.jpg"
+        src="/splash-logo.png"
         alt={brand.name}
         className="splash-mark relative z-10 h-auto w-[min(78vw,360px)] select-none object-contain"
       />

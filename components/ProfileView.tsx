@@ -174,8 +174,6 @@ export function ProfileView() {
           </div>
         </div>
 
-        <AccountPanel />
-
         <div className="mt-8">
           <h2 className="font-serif text-2xl tracking-tight">Seus reels</h2>
           {mine.length === 0 ? (
@@ -191,6 +189,8 @@ export function ProfileView() {
             </div>
           )}
         </div>
+
+        <AccountPanel />
 
         {error && <p className="mt-4 text-sm text-gold-2">{error}</p>}
 

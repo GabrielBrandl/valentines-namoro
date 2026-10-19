@@ -172,7 +172,7 @@ export function Onboarding() {
           <div className="mt-auto mb-10 flex flex-col items-center text-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/splash.jpg"
+              src="/splash-logo.png"
               alt={brand.name}
               className="h-auto w-[min(68vw,248px)] object-contain drop-shadow-[0_12px_40px_rgba(212,175,55,0.45)]"
             />
