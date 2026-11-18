@@ -10,7 +10,6 @@ export function ClubScreen() {
   const commerce = useCommerce();
   const product = useProduct();
   const [note, setNote] = useState("");
-  void product;
 
   function redeem(_perkId: string, cost: number, title: string) {
     if (!commerce.redeemPoints(cost)) {
