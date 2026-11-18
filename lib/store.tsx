@@ -871,11 +871,7 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
 
   const repostReel = useCallback(
     async (reelId: string) => {
-      const all = [
-        ...stateRef.current.myReels,
-        ...stateRef.current.cloudReels,
-        ...SEED_REELS,
-      ];
+      const all = [...stateRef.current.myReels, ...stateRef.current.cloudReels];
       const reel = all.find((r) => r.id === reelId);
       if (!reel) throw new Error("Reel não encontrado.");
       if (reel.authorId === "me" && !reel.repostOf) throw new Error("Esse reel já é seu.");
@@ -980,7 +976,8 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
 
   const deck = useMemo(() => {
     const { prefs, passes, likes, liveReady } = state;
-    const pool = [...(liveReady ? getLivePeople() : []), ...PEOPLE];
+    // Produção: só perfis reais da nuvem (sem PEOPLE/seed)
+    const pool = liveReady ? getLivePeople() : [];
     const seen = new Set<string>();
     const list = pool
       .filter((person) => {
@@ -1010,25 +1007,19 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
 
   const likesYou = useMemo(
     () =>
-      PEOPLE.filter(
-        (person) =>
-          person.likesYou && !state.likes.includes(person.id) && !state.passes.includes(person.id),
-      ).map(decorate),
-    [state.likes, state.passes],
+      getLivePeople()
+        .filter(
+          (person) =>
+            person.likesYou && !state.likes.includes(person.id) && !state.passes.includes(person.id),
+        )
+        .map(decorate),
+    [state.likes, state.passes, state.liveReady],
   );
 
   const reels = useMemo(() => {
-    const seeded = SEED_REELS.map((reel) => {
-      const extra = state.reelExtras[reel.id];
-      return {
-        ...reel,
-        liked: Boolean(extra?.liked),
-        likes: reel.likes + (extra?.liked ? 1 : 0),
-        comments: [...reel.comments, ...(extra?.comments ?? [])],
-      };
-    });
+    // Produção: só reels reais (meus + nuvem), sem SEED_REELS
     const seen = new Set<string>();
-    const merged = [...state.myReels, ...state.cloudReels, ...seeded].filter((reel) => {
+    const merged = [...state.myReels, ...state.cloudReels].filter((reel) => {
       if (seen.has(reel.id) || state.reportedReels.includes(reel.id)) return false;
       seen.add(reel.id);
       return true;

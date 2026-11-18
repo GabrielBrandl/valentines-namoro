@@ -56,6 +56,7 @@ export function Reels({ mode = "reels" }: { mode?: "home" | "reels" }) {
   const feed = tab === "seguindo" ? followingFeed : ordered;
   const emptyFollowing = tab === "seguindo" && followingFeed.length === 0;
   const list = emptyFollowing ? [] : feed.length ? feed : ordered;
+
   const activeReel = list.find((reel) => reel.id === active) ?? list[0];
   const sheetReel = sheet ? reels.find((reel) => reel.id === sheet) : undefined;
   const reportTarget = reportReelId ? reels.find((r) => r.id === reportReelId) : null;
@@ -98,6 +99,19 @@ export function Reels({ mode = "reels" }: { mode?: "home" | "reels" }) {
             </p>
             <button className="mt-5 rounded-2xl gold-fill px-5 py-3 text-sm font-bold text-black" onClick={() => setTab("para-voce")}>
               Ver Para você
+            </button>
+          </div>
+        </div>
+      ) : list.length === 0 ? (
+        <div className="grid h-full place-items-center px-8 text-center text-white/70">
+          <div>
+            <p className="font-serif text-2xl text-gold">Seu feed começa aqui</p>
+            <p className="mt-2 text-sm">Publique o primeiro reel — ele aparece pra você e para outras pessoas no app.</p>
+            <button
+              className="mt-5 rounded-2xl gold-fill px-5 py-3 text-sm font-bold text-black"
+              onClick={() => setPublishing(true)}
+            >
+              Publicar reel
             </button>
           </div>
         </div>

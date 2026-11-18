@@ -66,6 +66,6 @@ export async function registerServiceWorker() {
   try {
     await navigator.serviceWorker.register("/sw.js");
   } catch {
-    /* SW opcional na demo */
+    /* SW opcional se o browser bloquear */
   }
 }

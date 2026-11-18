@@ -176,7 +176,7 @@ export function AccountPanel() {
             Créditos neste aparelho: <span className="font-semibold text-ink">{product.state.credits}</span>
           </p>
           <p className="mt-2 text-xs text-muted">
-            Compras são simulação para demo. Nada é cobrado de verdade nesta versão.
+            Pagamentos reais entram em breve. Enquanto isso, créditos e planos nesta conta não geram cobrança.
           </p>
           {product.state.ledger.slice(0, 3).map((row) => (
             <p key={row.id} className="mt-1 flex justify-between text-xs">

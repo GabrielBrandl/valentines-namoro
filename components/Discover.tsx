@@ -184,11 +184,23 @@ export function Discover() {
         ) : (
           <div className="grid h-full place-items-center rounded-[28px] bg-panel p-8 text-center">
             <div>
-              <p className="font-serif text-4xl gold-text">Acabou por aqui.</p>
-              <p className="mt-2 text-muted">Você já viu todo mundo desse filtro.</p>
-              <button className="mt-5 rounded-2xl gold-fill px-5 py-3 font-bold" onClick={resetDeck}>
-                Ver de novo
-              </button>
+              <p className="font-serif text-4xl gold-text">
+                {deck.length === 0 && history.length === 0 ? "Aguardando pessoas" : "Acabou por aqui."}
+              </p>
+              <p className="mt-2 text-muted">
+                {deck.length === 0 && history.length === 0
+                  ? "Quando outras pessoas criarem conta, elas aparecem aqui. Convide alguém ou volte mais tarde."
+                  : "Você já viu todo mundo desse filtro."}
+              </p>
+              {history.length > 0 ? (
+                <button className="mt-5 rounded-2xl gold-fill px-5 py-3 font-bold" onClick={resetDeck}>
+                  Ver de novo
+                </button>
+              ) : (
+                <button className="mt-5 rounded-2xl gold-fill px-5 py-3 font-bold" onClick={() => setFilters(true)}>
+                  Ajustar filtros
+                </button>
+              )}
             </div>
           </div>
         )}

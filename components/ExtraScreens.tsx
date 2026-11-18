@@ -77,7 +77,7 @@ export function SponsorScreen() {
           <span>{likes}</span>
         </li>
         <li className="flex justify-between rounded-xl bg-panel px-3 py-2">
-          <span>Compras simuladas</span>
+          <span>Compras</span>
           <span>{buys}</span>
         </li>
         <li className="flex justify-between rounded-xl bg-panel px-3 py-2">

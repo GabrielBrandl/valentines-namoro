@@ -10,7 +10,7 @@ export function ShopScreen() {
   const [id, setId] = useState<string | null>(null);
   const item = SHOP.find((entry) => entry.id === id) ?? null;
   return (
-    <Subpage title="Loja" lede="Itens avulsos a partir de R$ 6. O pagamento é uma simulação de PIX, sem cobrança.">
+    <Subpage title="Loja" lede="Itens avulsos a partir de R$ 6. Pagamento real em breve — por enquanto sem cobrança.">
       <div className="grid grid-cols-3 gap-2 rounded-2xl bg-panel p-3 text-center text-xs">
         <p>
           <span className="block font-serif text-xl font-bold text-gold">{product.superLeft}</span>
@@ -41,7 +41,7 @@ export function ShopScreen() {
         ))}
       </div>
       <div className="mt-6 rounded-3xl bg-panel p-4">
-        <p className="text-sm font-semibold">Últimas compras simuladas</p>
+        <p className="text-sm font-semibold">Últimas compras nesta conta</p>
         <ul className="mt-2 space-y-1">
           {product.state.ledger.filter((row) => row.label.startsWith("Compra:") || row.label.startsWith("Plano ")).length ===
             0 && <li className="text-sm text-muted">Nenhuma ainda.</li>}

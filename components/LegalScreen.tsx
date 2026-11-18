@@ -51,8 +51,8 @@ export function LegalScreen({ kind }: { kind: LegalKind }) {
         <article className="space-y-3 text-sm leading-relaxed text-sand">
           <p>O {brand.name} é destinado exclusivamente a pessoas com 18 anos ou mais. Ao criar conta, você declara essa condição e autoriza checagens de idade quando solicitadas.</p>
           <p>Você é responsável pelo conteúdo que publica (fotos, vídeos, textos e reels). É proibido assédio, discurso de ódio, conteúdo sexual envolvendo menores, impersonação, spam e fraude.</p>
-          <p>Perfis de demonstração podem aparecer no deck para ilustrar o produto. Avaliações e depoimentos exibidos devem ser reais; não usamos avaliações fabricadas.</p>
-          <p>Recursos pagos (planos, boosts, itens) só são cobrados quando um fluxo de pagamento regulado estiver ativo. Enquanto isso, qualquer compra no app é simulada e não gera cobrança.</p>
+          <p>O Match e o feed mostram apenas perfis e vídeos reais publicados por pessoas com conta. Avaliações e depoimentos exibidos devem ser reais; não usamos avaliações fabricadas.</p>
+          <p>Recursos pagos (planos, boosts, itens) só são cobrados quando o fluxo de pagamento regulado estiver ativo. Até lá, compras no app não geram cobrança.</p>
           <p>Sorteios e prêmios só ocorrem com autorização legal competente. Não há promessa de ganhos, encontros ou resultados afetivos.</p>
           <p>Podemos suspender contas que violem estes termos, após denúncia ou moderação. O uso contínuo implica aceite destes termos e da política de privacidade.</p>
           <p>
@@ -131,7 +131,7 @@ export function LegalScreen({ kind }: { kind: LegalKind }) {
       <Subpage title="Política de reembolso" lede="Regras para cobranças quando o pagamento real estiver ativo.">
         <LegalNav current="/reembolso" />
         <article className="space-y-3 text-sm leading-relaxed text-sand">
-          <p>Enquanto compras forem apenas simuladas no app, não há cobrança e portanto não há reembolso a processar.</p>
+          <p>Enquanto o pagamento regulado não estiver ativo, não há cobrança e portanto não há reembolso a processar.</p>
           <p>Quando um parceiro de pagamento regulado estiver integrado: assinaturas recorrentes podem ser canceladas a qualquer momento, com efeito no próximo ciclo; itens consumíveis (boosts etc.) só são reembolsáveis em caso de falha técnica comprovada ou cobrança indevida.</p>
           <p>Pedidos de reembolso: {company.supportEmail}, com e-mail da conta, data e comprovante. Análise em até 7 dias úteis.</p>
           <p>Direitos do Código de Defesa do Consumidor (CDC) permanecem aplicáveis às compras reais.</p>
@@ -178,7 +178,7 @@ export function LegalScreen({ kind }: { kind: LegalKind }) {
           <strong className="text-white">Privacidade / DPO:</strong> {company.dpoEmail}
         </p>
         <p>
-          Atualize CNPJ e endereço reais antes do lançamento comercial. Os valores atuais são placeholders operacionais do produto.
+          Dados societários (CNPJ/endereço) devem permanecer atualizados no cadastro da empresa.
         </p>
       </article>
     </Subpage>

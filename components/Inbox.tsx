@@ -20,16 +20,13 @@ const ROOMS = [
   { id: "lgbt", title: "Mundo LGBTQIA+", detail: "Espaço seguro pra comunidade.", people: 9700, tag: "LGBTQIA+", tone: "from-[#7a1cff] to-[#ff4d8d]", icon: "🏳️‍🌈" },
 ];
 
-const FILTERS = ["Todas", "Hetero", "LGBTQIA+", "Geral"] as const;
-
 export function Inbox({ activeId }: { activeId?: string }) {
   const { matches, messages, likesYou, like, pass, lastRead } = useFecon();
   const product = useProduct();
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]>("Todas");
   const [sheet, setSheet] = useState<Person | null>(null);
   const [paywall, setPaywall] = useState(false);
-  const [tab, setTab] = useState<"salas" | "matches">(matches.length > 0 || Boolean(activeId) ? "matches" : "salas");
+  const [tab, setTab] = useState<"salas" | "matches">("matches");
   const [roomId, setRoomId] = useState<string | null>(null);
   const router = useRouter();
   const activeRoom = roomId ? ROOMS.find((room) => room.id === roomId) : null;
@@ -53,11 +50,6 @@ export function Inbox({ activeId }: { activeId?: string }) {
         return pin || (b.last?.at ?? b.match.at) - (a.last?.at ?? a.match.at);
       });
   }, [matches, messages, query, lastRead, product.state.hidden, product.state.pins]);
-
-  const rooms = ROOMS.filter((room) => {
-    if (filter !== "Todas" && room.tag !== filter) return false;
-    return room.title.toLowerCase().includes(query.trim().toLowerCase());
-  });
 
   return (
     <div className="grid h-full bg-paper md:grid-cols-[360px_minmax(0,1fr)]">
@@ -96,38 +88,20 @@ export function Inbox({ activeId }: { activeId?: string }) {
 
         {tab === "salas" ? (
           <>
-            <div className="no-scrollbar mt-3 flex gap-2 overflow-x-auto px-4">
-              {FILTERS.map((item) => (
+            <div className="app-scroll mt-6 min-h-0 flex-1 space-y-3 overflow-y-auto px-4 pb-4">
+              <article className="rounded-3xl border border-[#d4af37]/35 bg-panel p-5 text-sm text-sand">
+                <p className="font-semibold text-gold">Salas ao vivo em breve</p>
+                <p className="mt-2">
+                  Estamos liberando o chat em grupo com gente de verdade. Por agora use Matches para conversar 1:1.
+                </p>
                 <button
-                  key={item}
-                  onClick={() => setFilter(item)}
-                  className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ${
-                    filter === item ? "gold-fill" : "bg-panel text-muted"
-                  }`}
+                  type="button"
+                  className="mt-4 w-full rounded-2xl gold-fill py-3 text-sm font-bold text-black"
+                  onClick={() => setTab("matches")}
                 >
-                  {item}
+                  Ir para Matches
                 </button>
-              ))}
-            </div>
-            <div className="app-scroll mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto px-3 pb-4">
-              {rooms.map((room) => (
-                <button
-                  key={room.id}
-                  className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left ${
-                    roomId === room.id ? "bg-panel-2 ring-1 ring-[#d4af37]/35" : "bg-panel"
-                  }`}
-                  onClick={() => setRoomId(room.id)}
-                >
-                  <span className={`grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br ${room.tone} text-xl`}>
-                    {room.icon}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-semibold">{room.title}</span>
-                    <span className="mt-0.5 block truncate text-sm text-muted">{room.detail}</span>
-                    <span className="mt-1 block text-xs text-gold">{(room.people / 1000).toFixed(1).replace(".", ",")}k participantes</span>
-                  </span>
-                </button>
-              ))}
+              </article>
             </div>
           </>
         ) : (
@@ -284,7 +258,7 @@ function RoomPane({
     setFeed((rows) => [...rows, { who: "Você", text: body }]);
     setText("");
     window.setTimeout(() => {
-      setFeed((rows) => [...rows, { who: "Sala", text: "Mensagem recebida na demo. Em produção isso iria ao chat ao vivo." }]);
+      setFeed((rows) => [...rows, { who: "Sala", text: "Salas ao vivo chegam em breve. Por enquanto use o chat dos seus matches." }]);
     }, 700);
   }
 
@@ -297,7 +271,7 @@ function RoomPane({
         <span className={`grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br ${room.tone} text-lg`}>{room.icon}</span>
         <div className="min-w-0 flex-1">
           <p className="truncate font-semibold">{room.title}</p>
-          <p className="text-xs text-gold">{(room.people / 1000).toFixed(1).replace(".", ",")}k online (demo)</p>
+          <p className="text-xs text-gold">Em breve · chat ao vivo</p>
         </div>
         <button className="hidden text-sm font-semibold text-muted md:inline" onClick={onBack}>
           Fechar
@@ -423,7 +397,7 @@ export function ChatPane({ id }: { id: string }) {
           className="grid h-10 w-10 place-items-center text-gold"
           aria-label="Ligar"
           onClick={() => {
-            setNote("Chamada de voz ainda não entra nesta demo.");
+            setNote("Chamada de voz chega em breve.");
             window.setTimeout(() => setNote(""), 2400);
           }}
         >

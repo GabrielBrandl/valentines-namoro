@@ -39,7 +39,7 @@ export function Checkout({
   return (
     <div className="fixed inset-0 z-50 grid place-items-end bg-black/70 md:place-items-center" onClick={onClose}>
       <div className="w-full max-w-md rounded-t-3xl bg-panel p-5 shadow-2xl md:rounded-3xl" onClick={(event) => event.stopPropagation()}>
-        <p className="text-xs font-bold text-gold">PIX simulado</p>
+        <p className="text-xs font-bold text-gold">PIX (sem cobrança por enquanto)</p>
         <h3 className="mt-1 font-serif text-3xl tracking-tight">{title}</h3>
         <p className="mt-2 text-2xl font-semibold">{brl(cents)}</p>
         <p className="mt-3 text-sm leading-relaxed text-sand">
@@ -60,7 +60,7 @@ export function Checkout({
           {copied ? "Código copiado" : "Copiar código"}
         </button>
         <button className="mt-4 w-full rounded-2xl gold-fill py-3 font-bold" onClick={onPaid}>
-          Confirmar pagamento simulado
+          Confirmar (sem cobrar)
         </button>
       </div>
     </div>
