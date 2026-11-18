@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { Photo, useMediaSrc } from "./Media";
 import { IconComment, IconHeart, IconPlus, IconShare, IconX } from "./Icons";
 import { getPerson } from "@/lib/seed";
@@ -17,7 +17,8 @@ import { brand } from "@/lib/brand";
 import type { Me, Reel } from "@/lib/types";
 import { ReportDialog } from "./product-ui";
 
-export function Reels({ mode = "reels" }: { mode?: "home" | "reels" }) {
+export function Reels({ mode: _mode = "reels" }: { mode?: "home" | "reels" }) {
+  void _mode;
   const {
     reels,
     me,
@@ -36,13 +37,14 @@ export function Reels({ mode = "reels" }: { mode?: "home" | "reels" }) {
   const ordered = [...reels].sort(
     (a, b) => Number(product.highlighted(b.id)) - Number(product.highlighted(a.id)) || b.at - a.at,
   );
-  const [tab, setTab] = useState<"seguindo" | "para-voce">(mode === "home" ? "para-voce" : "para-voce");
+  const [tab, setTab] = useState<"seguindo" | "para-voce">("para-voce");
   const [active, setActive] = useState(ordered[0]?.id ?? "");
   const [muted, setMuted] = useState(true);
   const [sheet, setSheet] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [reportReelId, setReportReelId] = useState<string | null>(null);
   const [toast, setToast] = useState("");
+  const feedRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     void refreshCloudReels();
@@ -51,11 +53,11 @@ export function Reels({ mode = "reels" }: { mode?: "home" | "reels" }) {
   }, [refreshCloudReels]);
 
   const followingFeed = ordered.filter(
-    (reel) => reel.mine || following.includes(reel.authorId),
+    (reel) => reel.mine || reel.authorId === "me" || following.includes(reel.authorId),
   );
-  const feed = tab === "seguindo" ? followingFeed : ordered;
+  const list = tab === "seguindo" ? followingFeed : ordered;
   const emptyFollowing = tab === "seguindo" && followingFeed.length === 0;
-  const list = emptyFollowing ? [] : feed.length ? feed : ordered;
+  const emptyForYou = tab === "para-voce" && ordered.length === 0;
 
   const activeReel = list.find((reel) => reel.id === active) ?? list[0];
   const sheetReel = sheet ? reels.find((reel) => reel.id === sheet) : undefined;
@@ -67,120 +69,149 @@ export function Reels({ mode = "reels" }: { mode?: "home" | "reels" }) {
     : "";
 
   useEffect(() => {
+    const first = list[0]?.id ?? "";
+    setActive(first);
+    const node = feedRef.current;
+    if (node) node.scrollTop = 0;
+    // Só ao trocar de aba — evita resetar o scroll a cada refresh do feed
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
+  useEffect(() => {
     const id = new URLSearchParams(window.location.search).get("v");
     if (!id) return;
     document.getElementById(`reel-${id}`)?.scrollIntoView({ block: "start" });
   }, [list.length]);
 
+  function switchTab(next: "seguindo" | "para-voce") {
+    setTab(next);
+  }
+
   return (
-    <div className="relative h-full min-h-0 overflow-hidden bg-black">
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-center gap-6 pt-[max(14px,env(safe-area-inset-top))] text-[15px] font-semibold text-white/55">
+    <div className="relative flex h-full min-h-0 overflow-hidden bg-black">
+      <div className="relative min-w-0 flex-1 overflow-hidden">
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex justify-center pt-[max(14px,env(safe-area-inset-top))]">
+          <div className="pointer-events-auto flex items-center gap-7 rounded-full bg-black/35 px-5 py-2 text-[15px] font-semibold text-white/55 backdrop-blur-sm">
+            <button
+              type="button"
+              className={`relative ${tab === "seguindo" ? "text-white" : ""}`}
+              onClick={() => switchTab("seguindo")}
+            >
+              Seguindo
+              {tab === "seguindo" && (
+                <span className="absolute -bottom-1 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full gold-fill" />
+              )}
+            </button>
+            <button
+              type="button"
+              className={`relative ${tab === "para-voce" ? "text-white" : ""}`}
+              onClick={() => switchTab("para-voce")}
+            >
+              Para você
+              {tab === "para-voce" && (
+                <span className="absolute -bottom-1 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full gold-fill" />
+              )}
+            </button>
+          </div>
+        </div>
+
+        {emptyFollowing ? (
+          <div className="grid h-full place-items-center px-8 text-center text-white/70">
+            <div>
+              <p className="font-serif text-2xl text-gold">Seguindo está vazio</p>
+              <p className="mt-2 text-sm">
+                Em Para você, toque no + do avatar para seguir. Seus próprios reels também aparecem aqui.
+              </p>
+              <button
+                type="button"
+                className="mt-5 rounded-2xl gold-fill px-5 py-3 text-sm font-bold text-black"
+                onClick={() => switchTab("para-voce")}
+              >
+                Ver Para você
+              </button>
+            </div>
+          </div>
+        ) : emptyForYou ? (
+          <div className="grid h-full place-items-center px-8 text-center text-white/70">
+            <div>
+              <p className="font-serif text-2xl text-gold">Seu feed começa aqui</p>
+              <p className="mt-2 text-sm">Publique o primeiro reel — ele aparece pra você e para outras pessoas no app.</p>
+              <button
+                type="button"
+                className="mt-5 rounded-2xl gold-fill px-5 py-3 text-sm font-bold text-black"
+                onClick={() => setPublishing(true)}
+              >
+                Publicar reel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div ref={feedRef} className="no-scrollbar h-full snap-y snap-mandatory overflow-y-auto">
+            {list.map((reel) => (
+              <Slide
+                key={`${tab}-${reel.id}`}
+                reel={reel}
+                me={me}
+                muted={muted}
+                following={following.includes(reel.authorId)}
+                onActive={setActive}
+                onToggleMute={() => setMuted((value) => !value)}
+                onLike={() => {
+                  if (!reel.liked) product.track("reel");
+                  toggleLike(reel.id);
+                }}
+                onComment={() => setSheet(reel.id)}
+                onFollow={() => toggleFollow(reel.authorId)}
+                onReport={() => setReportReelId(reel.id)}
+                onShare={async () => {
+                  const url = await shareReel(reel.id);
+                  try {
+                    if (navigator.share) {
+                      await navigator.share({
+                        title: brand.name,
+                        text: reel.caption,
+                        url,
+                      });
+                    } else {
+                      await navigator.clipboard.writeText(url);
+                    }
+                  } catch {
+                    try {
+                      await navigator.clipboard.writeText(url);
+                    } catch {
+                      /* ignore */
+                    }
+                  }
+                }}
+                onRepost={async () => {
+                  try {
+                    await repostReel(reel.id);
+                    setToast("Reel republicado no seu perfil");
+                    window.setTimeout(() => setToast(""), 2200);
+                  } catch (err) {
+                    window.alert(err instanceof Error ? err.message : "Não foi possível republicar.");
+                  }
+                }}
+              />
+            ))}
+          </div>
+        )}
+
+        {toast ? (
+          <div className="pointer-events-none absolute inset-x-0 top-[max(58px,calc(env(safe-area-inset-top)+48px))] z-40 flex justify-center px-4">
+            <p className="rounded-full bg-black/80 px-4 py-2 text-sm font-semibold text-gold shadow-lg">{toast}</p>
+          </div>
+        ) : null}
+
         <button
-          className={`pointer-events-auto ${tab === "seguindo" ? "text-white" : ""}`}
-          onClick={() => setTab("seguindo")}
+          className="absolute right-3 bottom-[calc(72px+env(safe-area-inset-bottom))] z-30 flex items-center gap-2 rounded-full gold-fill px-4 py-3 text-sm font-bold text-black shadow-lg md:right-4 md:top-[max(12px,env(safe-area-inset-top))] md:bottom-auto md:grid md:h-11 md:w-11 md:place-items-center md:px-0 md:py-0"
+          onClick={() => setPublishing(true)}
+          aria-label="Publicar reel"
         >
-          Seguindo
-        </button>
-        <button
-          className={`pointer-events-auto relative ${tab === "para-voce" ? "text-white" : ""}`}
-          onClick={() => setTab("para-voce")}
-        >
-          Para você
-          {tab === "para-voce" && <span className="absolute -bottom-1 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full gold-fill" />}
+          <IconPlus className="h-5 w-5" />
+          <span className="md:hidden">Publicar</span>
         </button>
       </div>
-
-      {emptyFollowing ? (
-        <div className="grid h-full place-items-center px-8 text-center text-white/70">
-          <div>
-            <p className="font-serif text-2xl text-gold">Ninguém na lista ainda</p>
-            <p className="mt-2 text-sm">
-              Toque em + no avatar de um reel em Para você para seguir. A lista sobrevive ao refresh.
-            </p>
-            <button className="mt-5 rounded-2xl gold-fill px-5 py-3 text-sm font-bold text-black" onClick={() => setTab("para-voce")}>
-              Ver Para você
-            </button>
-          </div>
-        </div>
-      ) : list.length === 0 ? (
-        <div className="grid h-full place-items-center px-8 text-center text-white/70">
-          <div>
-            <p className="font-serif text-2xl text-gold">Seu feed começa aqui</p>
-            <p className="mt-2 text-sm">Publique o primeiro reel — ele aparece pra você e para outras pessoas no app.</p>
-            <button
-              className="mt-5 rounded-2xl gold-fill px-5 py-3 text-sm font-bold text-black"
-              onClick={() => setPublishing(true)}
-            >
-              Publicar reel
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="no-scrollbar h-full snap-y snap-mandatory overflow-y-auto">
-          {list.map((reel) => (
-            <Slide
-              key={reel.id}
-              reel={reel}
-              me={me}
-              muted={muted}
-              following={following.includes(reel.authorId)}
-              onActive={setActive}
-              onToggleMute={() => setMuted((value) => !value)}
-              onLike={() => {
-                if (!reel.liked) product.track("reel");
-                toggleLike(reel.id);
-              }}
-              onComment={() => setSheet(reel.id)}
-              onFollow={() => toggleFollow(reel.authorId)}
-              onReport={() => setReportReelId(reel.id)}
-              onShare={async () => {
-                const url = await shareReel(reel.id);
-                try {
-                  if (navigator.share) {
-                    await navigator.share({
-                      title: brand.name,
-                      text: reel.caption,
-                      url,
-                    });
-                  } else {
-                    await navigator.clipboard.writeText(url);
-                  }
-                } catch {
-                  try {
-                    await navigator.clipboard.writeText(url);
-                  } catch {
-                    /* ignore */
-                  }
-                }
-              }}
-              onRepost={async () => {
-                try {
-                  await repostReel(reel.id);
-                  setToast("Reel republicado no seu perfil");
-                  window.setTimeout(() => setToast(""), 2200);
-                } catch (err) {
-                  window.alert(err instanceof Error ? err.message : "Não foi possível republicar.");
-                }
-              }}
-            />
-          ))}
-        </div>
-      )}
-
-      {toast ? (
-        <div className="pointer-events-none absolute inset-x-0 top-[max(52px,calc(env(safe-area-inset-top)+40px))] z-40 flex justify-center px-4">
-          <p className="rounded-full bg-black/80 px-4 py-2 text-sm font-semibold text-gold shadow-lg">{toast}</p>
-        </div>
-      ) : null}
-
-      <button
-        className="absolute right-3 bottom-[calc(72px+env(safe-area-inset-bottom))] z-30 flex items-center gap-2 rounded-full gold-fill px-4 py-3 text-sm font-bold text-black shadow-lg md:right-4 md:top-[max(12px,env(safe-area-inset-top))] md:bottom-auto md:grid md:h-11 md:w-11 md:place-items-center md:px-0 md:py-0"
-        onClick={() => setPublishing(true)}
-        aria-label="Publicar reel"
-      >
-        <IconPlus className="h-5 w-5" />
-        <span className="md:hidden">Publicar</span>
-      </button>
 
       {sheetReel && (
         <div className="fixed inset-0 z-40 flex items-end bg-black/70" onClick={() => setSheet(null)}>
@@ -208,7 +239,8 @@ export function Reels({ mode = "reels" }: { mode?: "home" | "reels" }) {
           onPublish={async (file, caption, meta) => {
             await publishReel(file, caption, meta);
             setPublishing(false);
-            setToast("Reel publicado — já aparece no feed");
+            setTab("para-voce");
+            setToast("Reel publicado — já aparece no feed com o áudio original");
             window.setTimeout(() => setToast(""), 2400);
             void refreshCloudReels();
           }}
@@ -225,7 +257,7 @@ export function Reels({ mode = "reels" }: { mode?: "home" | "reels" }) {
       )}
 
       {activeReel && (
-        <aside className="pointer-events-none absolute inset-y-0 right-0 hidden w-[360px] border-l border-line bg-panel lg:pointer-events-auto lg:block">
+        <aside className="hidden w-[360px] shrink-0 border-l border-line bg-panel lg:block">
           <Comments
             reel={activeReel}
             onSend={(text) => addComment(activeReel.id, text)}
@@ -282,7 +314,7 @@ function Slide({
   const product = useProduct();
   const highlighted = product.highlighted(reel.id);
   const handle = `@${author.name.toLowerCase().replace(/\s+/g, ".")}`;
-  const isMine = reel.authorId === "me";
+  const isMine = reel.authorId === "me" || Boolean(reel.mine);
   const tags = reel.hashtags?.length ? reel.hashtags : extractHashtags(reel.caption);
   const filter = effectCss(reel.effect?.filter);
   const speed = reel.effect?.speed && reel.effect.speed > 0 ? reel.effect.speed : 1;
@@ -295,16 +327,44 @@ function Slide({
       ([entry]) => {
         if (entry.isIntersecting) {
           onActive(reel.id);
+          video.muted = muted;
+          video.volume = 1;
           video.play().catch(() => undefined);
         } else {
           video.pause();
         }
       },
-      { threshold: 0.72 },
+      { threshold: 0.55 },
     );
     observer.observe(node);
     return () => observer.disconnect();
-  }, [reel.id, onActive, src]);
+  }, [reel.id, onActive, src, muted]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = muted;
+    video.volume = 1;
+    if (!muted) {
+      const play = video.play();
+      if (play) play.catch(() => undefined);
+    }
+  }, [muted, src]);
+
+  function handleVideoTap(event: ReactMouseEvent) {
+    event.preventDefault();
+    const now = Date.now();
+    if (now - lastTap.current < 280) {
+      if (!reel.liked) onLike();
+      setBurst(true);
+      window.setTimeout(() => setBurst(false), 700);
+      lastTap.current = 0;
+      return;
+    }
+    lastTap.current = now;
+    // Toque simples: liga/desliga o áudio (navegadores bloqueiam som sem gesto)
+    onToggleMute();
+  }
 
   return (
     <article id={`reel-${reel.id}`} ref={boxRef} className="relative h-full snap-start overflow-hidden bg-black">
@@ -317,21 +377,15 @@ function Slide({
           style={{ filter, ...(speed !== 1 ? { animationDuration: `${speed}s` } : undefined) }}
           loop
           playsInline
+          preload="auto"
           muted={muted}
           onLoadedMetadata={(e) => {
             e.currentTarget.playbackRate = speed;
+            e.currentTarget.volume = 1;
+            e.currentTarget.muted = muted;
           }}
           onError={() => setFailed(true)}
-          onClick={(event) => {
-            const now = Date.now();
-            if (now - lastTap.current < 280) {
-              if (!reel.liked) onLike();
-              setBurst(true);
-              window.setTimeout(() => setBurst(false), 700);
-            }
-            lastTap.current = now;
-            event.preventDefault();
-          }}
+          onClick={handleVideoTap}
         />
       ) : (
         <Photo
@@ -343,6 +397,18 @@ function Slide({
       )}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/35" />
       {burst && <IconHeart className="heart-pop pointer-events-none absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 text-gold" />}
+      {muted && src && isVideo && !failed ? (
+        <button
+          type="button"
+          className="absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/70 px-5 py-3 text-sm font-bold text-white shadow-lg ring-1 ring-white/30"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleMute();
+          }}
+        >
+          🔇 Toque para ativar o som
+        </button>
+      ) : null}
 
       <div className="absolute right-3 bottom-28 z-10 flex flex-col items-center gap-5 text-white drop-shadow-lg">
         <div className="relative h-12 w-12 shrink-0">
@@ -408,8 +474,14 @@ function Slide({
           </button>
         )}
         <button
-          className="mt-1 grid h-11 w-11 place-items-center rounded-full border-2 border-white/50 bg-black/50 text-lg"
-          onClick={onToggleMute}
+          type="button"
+          className={`mt-1 grid h-11 w-11 place-items-center rounded-full border-2 text-lg ${
+            muted ? "border-gold bg-black/70 text-gold" : "border-white/50 bg-black/50 text-white"
+          }`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleMute();
+          }}
           aria-label={muted ? "Ativar som" : "Silenciar"}
         >
           {muted ? "🔇" : "🔊"}
