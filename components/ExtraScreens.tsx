@@ -122,44 +122,59 @@ function PwaStoresScreen() {
     const evt = deferred.current;
     if (!evt) {
       setInstallHint(
-        "No Chrome/Edge: menu → Instalar app. No iPhone: Compartilhar → Adicionar à Tela de Início.",
+        "Android Chrome: menu ⋮ → Instalar app. Windows/Linux Edge ou Chrome: ícone ⊕ na barra de endereço ou menu → Instalar Valentine's. iPhone: Compartilhar → Adicionar à Tela de Início.",
       );
       return;
     }
     await evt.prompt();
     const choice = await evt.userChoice;
-    setInstallHint(choice.outcome === "accepted" ? "Instalação iniciada." : "Instalação cancelada.");
+    setInstallHint(choice.outcome === "accepted" ? "App instalado — abra pelo ícone na tela inicial." : "Instalação cancelada.");
     deferred.current = null;
   }
 
   return (
     <Subpage
-      title="Lojas e PWA"
-      lede="Disponível em breve nas lojas. Enquanto isso, você pode instalar este site como app (PWA)."
+      title="Instalar o app"
+      lede="Valentine's funciona como aplicativo no Android, Windows e Linux — sem loja, direto do site."
     >
       <article className="space-y-3 rounded-3xl bg-panel p-4 text-sm leading-relaxed text-sand">
-        <p className="font-semibold text-gold">Disponível em breve nas lojas</p>
+        <p className="font-semibold text-gold">App instalável (PWA)</p>
         <p>
-          A publicação na App Store e na Google Play ainda não foi enviada. Esta demo é honesta: não há ficha
-          nas lojas neste momento.
+          Ao instalar, o Valentine&apos;s abre em tela cheia como app nativo. Conta, matches e vídeos
+          continuam na nuvem — atualizações do servidor não apagam o que você publicou.
         </p>
+        <ul className="list-disc space-y-1 pl-5">
+          <li>
+            <span className="font-semibold text-ink">Android</span> — Chrome → Instalar app / Adicionar à tela inicial
+          </li>
+          <li>
+            <span className="font-semibold text-ink">Windows</span> — Edge ou Chrome → Instalar Valentine&apos;s
+          </li>
+          <li>
+            <span className="font-semibold text-ink">Linux</span> — Chrome/Chromium/Edge → Instalar app
+          </li>
+          <li>
+            <span className="font-semibold text-ink">iPhone</span> — Safari → Compartilhar → Adicionar à Tela de Início
+          </li>
+        </ul>
+      </article>
+      <div className="mt-4 space-y-3 rounded-3xl bg-panel p-4 text-sm">
+        <p className="font-semibold">Instalar agora</p>
+        <button className="w-full rounded-2xl gold-fill py-3 font-bold text-black" onClick={install}>
+          Instalar Valentine&apos;s neste aparelho
+        </button>
+        {installHint && <p className="text-xs text-muted">{installHint}</p>}
+        <p className="text-xs text-muted">
+          Google Play / Microsoft Store podem vir depois. O app web instalável já está liberado para todo mundo.
+        </p>
+      </div>
+      <article className="mt-4 space-y-2 rounded-3xl border border-[#d4af37]/30 bg-black/40 p-4 text-sm text-sand">
+        <p className="font-semibold text-gold">Atualizações sem perder nada</p>
         <p>
-          O manifesto, o ícone e o service worker já estão no produto. Você pode instalar o PWA no aparelho
-          enquanto o build nativo não é submetido.
+          Reels, curtidas, republicações e perfil ficam no Supabase. Quando soltamos manutenção, você vê um
+          aviso suave e escolhe quando atualizar — o app não zera sua conta.
         </p>
       </article>
-      <div className="mt-4 space-y-2 rounded-3xl bg-panel p-4 text-sm">
-        <p className="font-semibold">Como instalar (PWA)</p>
-        <ol className="list-decimal space-y-1 pl-5 text-sand">
-          <li>Android Chrome: menu ⋮ → Instalar app / Adicionar à tela inicial.</li>
-          <li>iPhone Safari: Compartilhar → Adicionar à Tela de Início.</li>
-          <li>Desktop: ícone de instalação na barra de endereço, se aparecer.</li>
-        </ol>
-        <button className="mt-3 w-full rounded-2xl gold-fill py-3 font-bold" onClick={install}>
-          Instalar neste aparelho
-        </button>
-        {installHint && <p className="mt-2 text-xs text-muted">{installHint}</p>}
-      </div>
     </Subpage>
   );
 }

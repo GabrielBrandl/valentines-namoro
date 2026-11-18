@@ -20,14 +20,22 @@ export const metadata: Metadata = {
   title: brand.name,
   description: brand.tagline,
   applicationName: brand.name,
+  manifest: "/manifest.webmanifest",
   icons: {
-    icon: [{ url: "/app-icon.jpg", type: "image/jpeg" }],
-    apple: [{ url: "/app-icon.jpg", type: "image/jpeg" }],
+    icon: [
+      { url: "/icons/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
   appleWebApp: {
     capable: true,
     title: brand.name,
     statusBarStyle: "black-translucent",
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
   },
 };
 

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Photo } from "./Media";
 import { AccountPanel } from "./AccountPanel";
+import { InstallApp } from "./InstallApp";
 import { INTERESTS } from "@/lib/seed";
 import { compressImage, idbSet } from "@/lib/idb";
 import { useProduct } from "@/lib/product";
@@ -272,6 +273,17 @@ export function ProfileView() {
         <AccountPanel />
 
         {error && <p className="mt-4 text-sm text-gold-2">{error}</p>}
+
+        <div className="mt-8 space-y-3 rounded-3xl border border-[#d4af37]/35 bg-panel p-4">
+          <p className="text-sm font-semibold text-gold">Instalar o app</p>
+          <p className="text-sm text-sand">
+            Android, Windows ou Linux — abre como aplicativo. Vídeos e conta ficam salvos na nuvem.
+          </p>
+          <InstallApp compact />
+          <a href="/lojas" className="block text-center text-xs font-semibold text-gold">
+            Ver instruções completas
+          </a>
+        </div>
 
         <div className="mt-10 space-y-3 rounded-3xl border border-[#d4af37]/35 bg-panel p-4">
           <p className="text-sm font-semibold text-gold">Desenvolvedor</p>

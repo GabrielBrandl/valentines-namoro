@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { IconChat, IconClapper, IconMatch, IconUser } from "./Icons";
+import { AppLifecycle } from "./AppLifecycle";
 import { CookieBanner } from "./CookieBanner";
+import { InstallApp } from "./InstallApp";
 import { MatchModal } from "./MatchModal";
 import { Logo } from "./Logo";
 import { Splash } from "./Splash";
-import { registerServiceWorker } from "@/lib/notify";
 import { useFecon } from "@/lib/store";
 
 /** Fluxo do usuário final: vídeo → match → chat → eu */
@@ -41,10 +42,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
     pathname === "/recuperar" ||
     pathname === "/lojas" ||
     pathname === "/admin";
-
-  useEffect(() => {
-    registerServiceWorker();
-  }, []);
 
   useEffect(() => {
     if (!ready) return;
@@ -168,6 +165,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
       </div>
       <MatchModal />
       <CookieBanner />
+      {me ? <InstallApp /> : null}
+      <AppLifecycle />
     </div>
   );
 }

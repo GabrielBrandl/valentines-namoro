@@ -43,9 +43,9 @@ export function notify(title: string, body: string, tag?: string) {
   try {
     const n = new Notification(title, {
       body,
-      icon: "/app-icon.jpg",
+      icon: "/icons/icon-192.png",
       tag: tag || title,
-      badge: "/app-icon.jpg",
+      badge: "/icons/icon-192.png",
     });
     window.setTimeout(() => n.close(), 6000);
   } catch {
