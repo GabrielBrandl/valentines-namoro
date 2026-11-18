@@ -11,6 +11,8 @@ import {
 } from "react";
 import {
   loadCloudState,
+  loadDiscoverProfiles,
+  recordSwipe,
   saveCloudState,
   uploadMedia,
   upsertProfile,
@@ -18,7 +20,16 @@ import {
 } from "./cloud";
 import { idbGet, idbSet } from "./idb";
 import { notifyChatReply, notifyMatch } from "./notify";
-import { decorate, getPerson, PEOPLE, portrait, SEED_REELS } from "./seed";
+import {
+  decorate,
+  getLivePeople,
+  getPerson,
+  PEOPLE,
+  portrait,
+  setLivePeople,
+  SEED_REELS,
+} from "./seed";
+import type { Person } from "./types";
 import type {
   Comment,
   HistoryItem,
@@ -54,6 +65,7 @@ type State = Persisted & {
   ready: boolean;
   pendingMatchId: string | null;
   typingId: string | null;
+  liveReady: boolean;
 };
 
 const defaultPrefs: Prefs = {
@@ -87,7 +99,44 @@ const initial: State = {
   ready: false,
   pendingMatchId: null,
   typingId: null,
+  liveReady: false,
 };
+
+function profileToPerson(row: {
+  id: string;
+  name: string;
+  age: number;
+  city: string;
+  job: string;
+  bio: string;
+  gender: "mulher" | "homem";
+  interests: string[];
+  photos: string[];
+}): Person {
+  const photos = row.photos.length ? row.photos : [portrait(row.name)];
+  return {
+    id: row.id,
+    name: row.name,
+    age: row.age,
+    city: row.city,
+    job: row.job || "Em descoberta",
+    bio: row.bio || "Acabei de chegar no Valentine's.",
+    gender: row.gender,
+    interests: row.interests.length ? row.interests : ["Música"],
+    photos,
+    distanceKm: 2 + (row.name.length % 20),
+    likesYou: false,
+    online: true,
+    prompts: [{ q: "Sobre mim", a: row.bio || "Vamos conversar." }],
+    opener: `Oi! Vi seu perfil e quis dizer oi.`,
+    replies: [
+      "Oi! Que bom te ver por aqui. Como foi seu dia?",
+      "Gostei do seu perfil. O que você curte fazer no fim de semana?",
+      "Bora marcar um café quando der?",
+    ],
+    verified: false,
+  };
+}
 
 type Store = State & {
   saveMe: (me: Me) => void;
@@ -242,6 +291,25 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (!state.ready || !state.me) return;
+    let alive = true;
+    (async () => {
+      try {
+        const rows = await loadDiscoverProfiles();
+        if (!alive) return;
+        const people = rows.map(profileToPerson);
+        setLivePeople(people);
+        setState((s) => ({ ...s, liveReady: true }));
+      } catch {
+        if (alive) setState((s) => ({ ...s, liveReady: true }));
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [state.ready, state.me?.email]);
+
+  useEffect(() => {
     if (!state.ready || !hydrated.current) return;
     // Nunca grava perfil vazio por cima de uma sessão já salva (evita corrida no refresh).
     if (!state.me) {
@@ -366,19 +434,20 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
         history: [...s.history, { id, action: "pass" as const, matched: false } satisfies HistoryItem].slice(-12),
       };
     });
+    void recordSwipe(id, "pass").catch(() => {});
   }, []);
 
   const like = useCallback((id: string, superLike = false) => {
     if (stateRef.current.likes.includes(id) || stateRef.current.passes.includes(id)) return;
+    const person = getPerson(id);
+    const seedMatched = Boolean(person?.likesYou);
     setState((s) => {
       if (s.likes.includes(id) || s.passes.includes(id)) return s;
-      const person = getPerson(id);
-      const matched = Boolean(person?.likesYou);
       const next: State = {
         ...s,
         likes: [...s.likes, id],
         supers: superLike ? [...s.supers, id] : s.supers,
-        matches: matched
+        matches: seedMatched
           ? [{ id, at: Date.now(), super: superLike }, ...s.matches.filter((m) => m.id !== id)]
           : s.matches,
         history: [
@@ -386,20 +455,16 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
           {
             id,
             action: (superLike ? "super" : "like") as HistoryItem["action"],
-            matched,
+            matched: seedMatched,
           },
         ].slice(-12),
-        pendingMatchId: matched ? id : s.pendingMatchId,
-        // NÃO marca lastRead — o match fica não lido até abrir o chat.
+        pendingMatchId: seedMatched ? id : s.pendingMatchId,
       };
       return next;
     });
-    const person = getPerson(id);
-    if (person?.likesYou) {
+    if (seedMatched && person) {
       window.setTimeout(() => notifyMatch(person.name), 400);
-    }
-    if (superLike) {
-      if (person?.likesYou) {
+      if (superLike) {
         const stamp = generation.current;
         window.setTimeout(() => {
           if (generation.current !== stamp) return;
@@ -423,6 +488,20 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
         }, 1400);
       }
     }
+    void recordSwipe(id, superLike ? "super" : "like")
+      .then(({ matched }) => {
+        if (!matched || seedMatched) return;
+        setState((s) => ({
+          ...s,
+          matches: [{ id, at: Date.now(), super: superLike }, ...s.matches.filter((m) => m.id !== id)],
+          history: s.history.map((item, index) =>
+            index === s.history.length - 1 && item.id === id ? { ...item, matched: true } : item,
+          ),
+          pendingMatchId: id,
+        }));
+        if (person) window.setTimeout(() => notifyMatch(person.name), 400);
+      })
+      .catch(() => {});
   }, []);
 
   const undo = useCallback(() => {
@@ -598,25 +677,32 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
     replyTimers.current = {};
     msgTimes.current = [];
     localStorage.removeItem(STORAGE_KEY);
-    setState({ ...emptyPersist(), ready: true, pendingMatchId: null, typingId: null });
+    setLivePeople([]);
+    setState({ ...emptyPersist(), ready: true, pendingMatchId: null, typingId: null, liveReady: false });
   }, []);
 
   const deck = useMemo(() => {
-    const { prefs, passes, likes } = state;
-    const list = PEOPLE.filter((person) => {
-      if (passes.includes(person.id) || likes.includes(person.id)) return false;
-      if (person.sponsored) return true;
-      if (person.age < prefs.ageMin || person.age > prefs.ageMax) return false;
-      if (prefs.show !== "todos" && person.gender !== prefs.show) return false;
-      const km = displayDistance(person, prefs);
-      if (km > (prefs.maxKm ?? 50)) return false;
-      const decorated = decorate(person);
-      if (prefs.verifiedOnly && !decorated.verified) return false;
-      return true;
-    }).map((person) => {
-      const decorated = decorate(person);
-      return { ...decorated, distanceKm: displayDistance(person, prefs) };
-    });
+    const { prefs, passes, likes, liveReady } = state;
+    const pool = [...(liveReady ? getLivePeople() : []), ...PEOPLE];
+    const seen = new Set<string>();
+    const list = pool
+      .filter((person) => {
+        if (seen.has(person.id)) return false;
+        seen.add(person.id);
+        if (passes.includes(person.id) || likes.includes(person.id)) return false;
+        if (person.sponsored) return true;
+        if (person.age < prefs.ageMin || person.age > prefs.ageMax) return false;
+        if (prefs.show !== "todos" && person.gender !== prefs.show) return false;
+        const km = displayDistance(person, prefs);
+        if (km > (prefs.maxKm ?? 50)) return false;
+        const decorated = decorate(person);
+        if (prefs.verifiedOnly && !decorated.verified) return false;
+        return true;
+      })
+      .map((person) => {
+        const decorated = decorate(person);
+        return { ...decorated, distanceKm: displayDistance(person, prefs) };
+      });
     const ads = list.filter((person) => person.sponsored);
     const people = list.filter((person) => !person.sponsored);
     if (ads[0]) people.splice(Math.min(3, people.length), 0, ads[0]);

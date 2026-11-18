@@ -138,7 +138,19 @@ export async function uploadMedia(file: Blob, folder: string, ext = "jpg") {
   return data.publicUrl;
 }
 
-export async function loadDiscoverProfiles(excludeIds: string[] = []) {
+export type CloudProfile = {
+  id: string;
+  name: string;
+  age: number;
+  city: string;
+  job: string;
+  bio: string;
+  gender: "mulher" | "homem";
+  interests: string[];
+  photos: string[];
+};
+
+export async function loadDiscoverProfiles(excludeIds: string[] = []): Promise<CloudProfile[]> {
   const supabase = createClient();
   const { data: auth } = await supabase.auth.getUser();
   let query = supabase
@@ -152,5 +164,95 @@ export async function loadDiscoverProfiles(excludeIds: string[] = []) {
   const { data, error } = await query;
   if (error) throw new Error(error.message);
 
-  return (data ?? []).filter((row) => !excludeIds.includes(row.id));
+  return (data ?? [])
+    .filter((row) => row?.id && row?.name && !excludeIds.includes(row.id))
+    .map((row) => ({
+      id: row.id as string,
+      name: String(row.name || "Sem nome"),
+      age: Number(row.age) || 18,
+      city: String(row.city || "Brasil"),
+      job: String(row.job || "Em descoberta"),
+      bio: String(row.bio || ""),
+      gender: row.gender === "homem" ? "homem" : "mulher",
+      interests: Array.isArray(row.interests) ? (row.interests as string[]) : [],
+      photos: Array.isArray(row.photos) ? (row.photos as string[]).filter(Boolean) : [],
+    }));
+}
+
+export async function recordSwipe(targetId: string, action: "like" | "pass" | "super") {
+  const supabase = createClient();
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return { matched: false };
+
+  const { error } = await supabase.from("swipes").upsert(
+    {
+      user_id: auth.user.id,
+      target_id: targetId,
+      action,
+    },
+    { onConflict: "user_id,target_id" },
+  );
+  if (error) throw new Error(error.message);
+
+  if (action === "pass") return { matched: false };
+
+  // Match mútuo só entre contas reais (uuid).
+  if (!/^[0-9a-f-]{36}$/i.test(targetId)) return { matched: false };
+
+  const { data: theirs } = await supabase
+    .from("swipes")
+    .select("action")
+    .eq("user_id", targetId)
+    .eq("target_id", auth.user.id)
+    .maybeSingle();
+
+  const matched = theirs?.action === "like" || theirs?.action === "super";
+  if (matched) {
+    await supabase.from("matches").upsert(
+      {
+        user_id: auth.user.id,
+        target_id: targetId,
+        is_super: action === "super",
+      },
+      { onConflict: "user_id,target_id" },
+    );
+  }
+  return { matched };
+}
+
+export async function loadAdminDashboard() {
+  const supabase = createClient();
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) throw new Error("Faça login para abrir o painel.");
+
+  const { data: profiles, error } = await supabase
+    .from("profiles")
+    .select("id,name,email,age,city,gender,photos,created_at,updated_at")
+    .order("created_at", { ascending: false })
+    .limit(200);
+  if (error) throw new Error(error.message);
+
+  const { count: swipeCount } = await supabase
+    .from("swipes")
+    .select("*", { count: "exact", head: true });
+
+  const { count: matchCount } = await supabase
+    .from("matches")
+    .select("*", { count: "exact", head: true });
+
+  const { count: reelCount } = await supabase
+    .from("reels")
+    .select("*", { count: "exact", head: true });
+
+  return {
+    meId: auth.user.id,
+    meEmail: auth.user.email ?? null,
+    profiles: profiles ?? [],
+    totals: {
+      users: profiles?.length ?? 0,
+      swipes: swipeCount ?? 0,
+      matches: matchCount ?? 0,
+      reels: reelCount ?? 0,
+    },
+  };
 }

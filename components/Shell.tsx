@@ -34,7 +34,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
     pathname === "/privacidade" ||
     pathname === "/sorteio" ||
     pathname === "/recuperar" ||
-    pathname === "/lojas";
+    pathname === "/lojas" ||
+    pathname === "/admin";
 
   useEffect(() => {
     registerServiceWorker();

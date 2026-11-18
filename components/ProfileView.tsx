@@ -195,6 +195,10 @@ export function ProfileView() {
         {error && <p className="mt-4 text-sm text-gold-2">{error}</p>}
 
         <div className="mt-10 space-y-3 rounded-3xl border border-[#d4af37]/35 bg-panel p-4">
+          <p className="text-sm font-semibold text-gold">Desenvolvedor</p>
+          <a href="/admin" className="block w-full rounded-2xl gold-fill py-3 text-center text-sm font-bold">
+            Abrir painel admin
+          </a>
           <p className="text-sm font-semibold text-gold">Sessão neste aparelho</p>
           <button
             className="w-full rounded-2xl border border-[#d4af37]/50 py-3 text-sm font-bold text-gold"

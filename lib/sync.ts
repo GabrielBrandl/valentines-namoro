@@ -1,3 +1,5 @@
+import type { Me, Prefs } from "./types";
+
 const FECON_KEY = "fecon-v1";
 const PRODUCT_KEY = "valentine-product-v1";
 const AUTH_KEY = "valentines-auth";
@@ -72,25 +74,70 @@ export function getPendingReset(): { email: string; at: number } | null {
   }
 }
 
-/** Demo auth — senha simples (não é segurança real). */
-export function saveAuth(email: string, password: string) {
-  const hash = simpleHash(`${email.trim().toLowerCase()}::${password}`);
-  localStorage.setItem(
-    AUTH_KEY,
-    JSON.stringify({ email: email.trim().toLowerCase(), hash, at: Date.now() }),
-  );
+export type LocalAccount = {
+  email: string;
+  hash: string;
+  me: Me;
+  prefs?: Prefs;
+  at: number;
+};
+
+/** Cadastro local neste aparelho — some se limpar o navegador. */
+export function saveAuth(email: string, password: string, me?: Me, prefs?: Prefs) {
+  const clean = email.trim().toLowerCase();
+  const prev = getLocalAccount();
+  const hash = simpleHash(`${clean}::${password}`);
+  const account: LocalAccount = {
+    email: clean,
+    hash,
+    me: me ?? prev?.me ?? {
+      id: "me",
+      name: clean.split("@")[0] || "Você",
+      age: 24,
+      city: "São Paulo",
+      job: "Em descoberta",
+      gender: "mulher",
+      bio: "Acabei de chegar no Valentine's.",
+      interests: ["Música"],
+      photos: [],
+    },
+    prefs,
+    at: Date.now(),
+  };
+  localStorage.setItem(AUTH_KEY, JSON.stringify(account));
+}
+
+export function getLocalAccount(): LocalAccount | null {
+  try {
+    const raw = localStorage.getItem(AUTH_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as LocalAccount;
+    if (!data?.email || !data?.me) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+export function loginLocalAccount(email: string, password: string): LocalAccount | null {
+  const account = getLocalAccount();
+  if (!account) return null;
+  if (account.email !== email.trim().toLowerCase()) return null;
+  if (account.hash !== simpleHash(`${email.trim().toLowerCase()}::${password}`)) return null;
+  return account;
 }
 
 export function checkAuth(email: string, password: string): boolean {
-  try {
-    const raw = localStorage.getItem(AUTH_KEY);
-    if (!raw) return false;
-    const data = JSON.parse(raw) as { email: string; hash: string };
-    if (data.email !== email.trim().toLowerCase()) return false;
-    return data.hash === simpleHash(`${email.trim().toLowerCase()}::${password}`);
-  } catch {
-    return false;
-  }
+  return Boolean(loginLocalAccount(email, password));
+}
+
+export function updateLocalAccountMe(me: Me, prefs?: Prefs) {
+  const account = getLocalAccount();
+  if (!account) return;
+  localStorage.setItem(
+    AUTH_KEY,
+    JSON.stringify({ ...account, me, prefs: prefs ?? account.prefs, at: Date.now() }),
+  );
 }
 
 function simpleHash(input: string) {

@@ -401,7 +401,19 @@ export function decorate(person: Person): Person {
   return { ...person, verified: true };
 }
 
+let liveRegistry: Person[] = [];
+
+export function setLivePeople(people: Person[]) {
+  liveRegistry = people;
+}
+
+export function getLivePeople() {
+  return liveRegistry;
+}
+
 export function getPerson(id: string) {
+  const live = liveRegistry.find((item) => item.id === id);
+  if (live) return live;
   const person = PEOPLE.find((item) => item.id === id);
   return person ? decorate(person) : null;
 }
