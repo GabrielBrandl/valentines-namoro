@@ -150,7 +150,7 @@ export function Inbox({ activeId }: { activeId?: string }) {
                     >
                       <Photo
                         src={person.photos[0]}
-                        alt=""
+                        alt={`Foto de ${person.name}`}
                         className={`h-16 w-16 rounded-full object-cover ring-2 ring-gold ${product.canSeeLikes ? "" : "blur-md"}`}
                       />
                       <span className="mt-1 block truncate text-xs">{product.canSeeLikes ? person.name : "Alguém"}</span>
@@ -171,7 +171,7 @@ export function Inbox({ activeId }: { activeId?: string }) {
                     activeId === match.id ? "bg-panel" : "hover:bg-panel"
                   }`}
                 >
-                  <Photo src={person!.photos[0]} alt="" className="h-14 w-14 rounded-full object-cover" />
+                  <Photo src={person!.photos[0]} alt={`Foto de ${person!.name}`} className="h-14 w-14 rounded-full object-cover" />
                   <span className="min-w-0 flex-1">
                     <span className="flex items-baseline justify-between gap-3">
                       <span className="min-w-0 truncate font-semibold">{person!.name}</span>
@@ -412,7 +412,7 @@ export function ChatPane({ id }: { id: string }) {
         <button className="grid h-11 w-11 place-items-center text-3xl leading-none text-gold md:hidden" onClick={() => router.push("/matches")} aria-label="Voltar">
           ‹
         </button>
-        <Photo src={person.photos[0]} alt="" className="h-11 w-11 rounded-full object-cover ring-1 ring-gold/50" />
+        <Photo src={person.photos[0]} alt={`Foto de ${person.name}`} className="h-11 w-11 rounded-full object-cover ring-1 ring-gold/50" />
         <div className="min-w-0 flex-1">
           <p className="truncate font-semibold">{person.name}</p>
           <p className={`text-xs font-semibold ${person.online ? "text-mint" : "text-muted"}`}>
@@ -480,7 +480,7 @@ export function ChatPane({ id }: { id: string }) {
                   {message.media && (
                     <Photo
                       src={message.media}
-                      alt=""
+                      alt="Mídia da conversa"
                       className="mb-2 max-h-56 w-full rounded-xl object-cover"
                     />
                   )}

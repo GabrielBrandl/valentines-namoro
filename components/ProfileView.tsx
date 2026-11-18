@@ -146,8 +146,19 @@ export function ProfileView() {
           </div>
           <p className="mt-4 text-sm text-muted">
             Idade {prefs.ageMin} – {prefs.ageMax} · até {prefs.maxKm ?? 50} km
+            {prefs.city ? ` · ${prefs.city}` : ""}
             {prefs.verifiedOnly ? " · só verificados" : ""}
           </p>
+          <label className="mt-3 block text-xs text-muted">
+            Cidade preferida
+            <input
+              className="mt-1 w-full rounded-2xl bg-panel px-4 py-3 text-sm text-white outline-none ring-1 ring-[#d4af37]/25 focus:ring-[#d4af37]/60"
+              value={prefs.city || ""}
+              placeholder="Todas as cidades"
+              onChange={(e) => setPrefs({ ...prefs, city: e.target.value })}
+              aria-label="Filtrar Match por cidade"
+            />
+          </label>
           <div className="mt-2 grid grid-cols-2 gap-3">
             <label className="text-xs text-muted">
               Mínima
@@ -158,6 +169,7 @@ export function ProfileView() {
                 max={prefs.ageMax}
                 value={prefs.ageMin}
                 onChange={(e) => setPrefs({ ...prefs, ageMin: Math.min(Number(e.target.value), prefs.ageMax) })}
+                aria-label="Idade mínima"
               />
             </label>
             <label className="text-xs text-muted">
@@ -169,9 +181,18 @@ export function ProfileView() {
                 max={60}
                 value={prefs.ageMax}
                 onChange={(e) => setPrefs({ ...prefs, ageMax: Math.max(prefs.ageMin, Number(e.target.value)) })}
+                aria-label="Idade máxima"
               />
             </label>
           </div>
+          <label className="mt-4 flex items-center gap-3 text-sm">
+            <input
+              type="checkbox"
+              checked={Boolean(prefs.verifiedOnly)}
+              onChange={(e) => setPrefs({ ...prefs, verifiedOnly: e.target.checked })}
+            />
+            Só perfis verificados
+          </label>
         </div>
 
         <div className="mt-8">
@@ -182,7 +203,7 @@ export function ProfileView() {
             <div className="mt-3 grid grid-cols-3 gap-2">
               {mine.map((reel) => (
                 <button key={reel.id} onClick={() => router.push(`/reels?v=${reel.id}`)} className="text-left">
-                  <Photo src={reel.poster} alt="" className="aspect-[3/4] w-full rounded-2xl object-cover" />
+                  <Photo src={reel.poster} alt={`Capa do reel: ${reel.caption}`} className="aspect-[3/4] w-full rounded-2xl object-cover" />
                   <span className="mt-1 line-clamp-2 block text-xs text-muted">{reel.caption}</span>
                 </button>
               ))}

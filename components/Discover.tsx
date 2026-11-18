@@ -105,7 +105,7 @@ export function Discover() {
           <>
             {upcoming && (
               <article className="absolute inset-x-3 top-3 bottom-0 scale-[0.96] overflow-hidden rounded-[28px] bg-panel opacity-70">
-                <Photo src={upcoming.photos[0]} alt="" className="h-full w-full object-cover" />
+                <Photo src={upcoming.photos[0]} alt={`Foto de ${upcoming.name}`} className="h-full w-full object-cover" />
               </article>
             )}
             <article
@@ -348,6 +348,16 @@ function Filters({
             onChange={(e) => setDraft({ ...draft, ageMax: Number(e.target.value) })}
           />
         </div>
+        <label className="mt-5 block text-sm font-semibold text-muted">
+          Cidade
+          <input
+            value={draft.city || ""}
+            onChange={(e) => setDraft({ ...draft, city: e.target.value })}
+            placeholder="Todas as cidades"
+            className="mt-2 w-full rounded-2xl bg-black px-4 py-3 text-sm font-normal text-white outline-none ring-1 ring-[#d4af37]/25 focus:ring-[#d4af37]/60"
+            aria-label="Filtrar por cidade"
+          />
+        </label>
         <p className="mt-5 text-sm text-muted">Distância máxima: {draft.maxKm ?? 50} km</p>
         <input
           type="range"
@@ -357,6 +367,7 @@ function Filters({
           value={draft.maxKm ?? 50}
           onChange={(e) => setDraft({ ...draft, maxKm: Number(e.target.value) })}
           className="mt-2 w-full"
+          aria-label="Distância máxima em quilômetros"
         />
         <label className="mt-5 flex items-center gap-3 text-sm">
           <input

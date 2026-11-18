@@ -122,6 +122,51 @@ export async function upsertProfile(me: Me, prefs?: Prefs) {
   if (error) throw new Error(error.message);
 }
 
+export async function publishCloudReel(input: {
+  caption: string;
+  mediaUrl: string;
+  posterUrl?: string;
+}) {
+  const supabase = createClient();
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) throw new Error("Faça login para publicar.");
+
+  const { data, error } = await supabase
+    .from("reels")
+    .insert({
+      user_id: auth.user.id,
+      caption: input.caption,
+      media_url: input.mediaUrl,
+      poster_url: input.posterUrl ?? null,
+      likes: 0,
+    })
+    .select("id,created_at")
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export type CloudReel = {
+  id: string;
+  user_id: string;
+  caption: string;
+  media_url: string;
+  poster_url: string | null;
+  likes: number;
+  created_at: string;
+};
+
+export async function loadCloudReels(): Promise<CloudReel[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("reels")
+    .select("id,user_id,caption,media_url,poster_url,likes,created_at")
+    .order("created_at", { ascending: false })
+    .limit(60);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as CloudReel[];
+}
+
 export async function uploadMedia(file: Blob, folder: string, ext = "jpg") {
   const supabase = createClient();
   const { data: auth } = await supabase.auth.getUser();

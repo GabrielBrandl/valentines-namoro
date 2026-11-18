@@ -21,6 +21,10 @@ const HELP = [
   ["/suporte", "Suporte"],
   ["/termos", "Termos"],
   ["/privacidade", "Privacidade"],
+  ["/cookies", "Cookies"],
+  ["/reembolso", "Reembolso"],
+  ["/riscos", "Riscos"],
+  ["/empresa", "Empresa"],
 ] as const;
 
 export function AccountPanel() {
@@ -92,7 +96,7 @@ export function AccountPanel() {
         {product.state.photoVisibility !== "todos" && me?.photos[0] && (
           <Photo
             src={me.photos[0]}
-            alt=""
+            alt={`Prévia da foto de ${me.name}`}
             className={`mt-3 h-36 w-full rounded-2xl object-cover ${product.state.photoVisibility === "ninguem" ? "blur-md" : "blur-sm"}`}
           />
         )}

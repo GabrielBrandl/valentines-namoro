@@ -56,7 +56,7 @@ export function PersonSheet({
             </div>
           ))}
           {person.photos[1] && (
-            <Photo src={person.photos[1]} alt="" className="h-72 w-full rounded-2xl object-cover" />
+            <Photo src={person.photos[1]} alt={`Segunda foto de ${person.name}`} className="h-72 w-full rounded-2xl object-cover" />
           )}
           <div className="sticky bottom-0 flex items-center justify-center gap-4 bg-paper py-3 pb-[max(12px,env(safe-area-inset-bottom))]">
             <Round label="Não" onClick={onPass}>

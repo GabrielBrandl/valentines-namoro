@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { IconChat, IconClapper, IconMatch, IconUser } from "./Icons";
+import { CookieBanner } from "./CookieBanner";
 import { MatchModal } from "./MatchModal";
 import { Logo } from "./Logo";
 import { Splash } from "./Splash";
@@ -32,6 +33,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
     pathname === "/" ||
     pathname === "/termos" ||
     pathname === "/privacidade" ||
+    pathname === "/cookies" ||
+    pathname === "/reembolso" ||
+    pathname === "/riscos" ||
+    pathname === "/empresa" ||
     pathname === "/sorteio" ||
     pathname === "/recuperar" ||
     pathname === "/lojas" ||
@@ -96,8 +101,14 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="mx-auto flex h-dvh max-w-[1400px] overflow-hidden bg-paper text-ink">
+      <a
+        href="#conteudo-principal"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-[80] focus:rounded-xl focus:bg-gold focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-[#120e05]"
+      >
+        Ir para o conteúdo
+      </a>
       {showNav && (
-        <aside className="hidden w-[92px] shrink-0 flex-col items-center gap-2 border-r border-line bg-black py-5 md:flex">
+        <aside className="hidden w-[92px] shrink-0 flex-col items-center gap-2 border-r border-line bg-black py-5 md:flex" aria-label="Navegação principal">
           <Logo size="sm" mark />
           {nav.map((item) => {
             const active = pathname === item.href || (item.href === "/matches" && isChat);
@@ -106,11 +117,13 @@ export function Shell({ children }: { children: React.ReactNode }) {
               <button
                 key={item.href}
                 onClick={() => router.push(item.href)}
+                aria-label={item.label}
+                aria-current={active ? "page" : undefined}
                 className={`relative grid h-[68px] w-[72px] place-items-center rounded-2xl text-[11px] font-semibold ${
                   active ? "text-gold" : "text-muted hover:bg-panel-2"
                 }`}
               >
-                <Icon className="h-5 w-5" />
+                <Icon className="h-5 w-5" aria-hidden />
                 <span className="mt-1">{item.label}</span>
                 {item.href === "/matches" && unread > 0 && (
                   <span className="absolute right-3 top-2 grid h-5 min-w-5 place-items-center rounded-full gold-fill px-1 text-[10px] font-bold">
@@ -124,7 +137,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
       )}
 
       <div className="flex min-w-0 flex-1 flex-col bg-paper">
-        <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
+        <div id="conteudo-principal" className="min-h-0 flex-1 overflow-hidden" tabIndex={-1}>
+          {children}
+        </div>
         {showNav && !hideBottom && (
           <nav className="grid h-[calc(62px+env(safe-area-inset-bottom))] grid-cols-4 border-t border-line bg-black px-1 pt-1.5 pb-[env(safe-area-inset-bottom)] md:hidden">
             {nav.map((item) => {
@@ -152,6 +167,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         )}
       </div>
       <MatchModal />
+      <CookieBanner />
     </div>
   );
 }

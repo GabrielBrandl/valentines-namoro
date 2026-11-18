@@ -26,6 +26,7 @@ const defaultPrefs: Prefs = {
   ageMax: 45,
   maxKm: 50,
   verifiedOnly: false,
+  city: "",
 };
 
 export function Onboarding() {
@@ -44,6 +45,9 @@ export function Onboarding() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [savedName, setSavedName] = useState("");
+  const [acceptTerms, setAcceptTerms] = useState(false);
+  const [acceptPrivacy, setAcceptPrivacy] = useState(false);
+  const [acceptAge, setAcceptAge] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -172,6 +176,10 @@ export function Onboarding() {
       setError(`${brand.name} é só para maiores de 18 anos.`);
       return;
     }
+    if (!acceptAge || !acceptTerms || !acceptPrivacy) {
+      setError("Marque os consentimentos de idade, termos e privacidade (LGPD).");
+      return;
+    }
     setBusy(true);
     try {
       await signUp(cleanEmail, password, cleanName);
@@ -206,14 +214,16 @@ export function Onboarding() {
         email: cleanEmail,
       };
 
-      await upsertProfile(me, defaultPrefs);
+      const prefs: Prefs = { ...defaultPrefs, city: "" };
+      await upsertProfile(me, prefs);
       try {
         product.claim("");
         product.activate({ phone: "", uf: ufFromCity(me.city, "SP"), signal: "nenhum" });
+        product.acceptTerms();
       } catch {
         /* ignore */
       }
-      enterAs(me, defaultPrefs);
+      enterAs(me, prefs);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível criar a conta.");
     } finally {
@@ -245,6 +255,21 @@ export function Onboarding() {
           </div>
           {error && <p className="mb-3 text-center text-sm text-gold">{error}</p>}
           <div className="flex flex-col gap-3">
+            <p className="text-center text-[11px] leading-relaxed text-muted">
+              Ao continuar você declara ter 18+ e pode revisar{" "}
+              <Link href="/termos" className="text-gold underline underline-offset-2">
+                termos
+              </Link>
+              ,{" "}
+              <Link href="/privacidade" className="text-gold underline underline-offset-2">
+                privacidade
+              </Link>{" "}
+              e{" "}
+              <Link href="/cookies" className="text-gold underline underline-offset-2">
+                cookies
+              </Link>
+              .
+            </p>
             <button
               className="rounded-full gold-fill px-6 py-[15px] text-[15px] font-bold tracking-wide"
               onClick={() => {
@@ -411,19 +436,61 @@ export function Onboarding() {
               }}
             />
           </label>
+          <fieldset className="space-y-3 rounded-2xl border border-line bg-panel p-4">
+            <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-gold">Consentimentos LGPD</legend>
+            <label className="flex items-start gap-3 text-sm text-sand">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={acceptAge}
+                onChange={(e) => setAcceptAge(e.target.checked)}
+              />
+              <span>Confirmo que tenho 18 anos ou mais.</span>
+            </label>
+            <label className="flex items-start gap-3 text-sm text-sand">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={acceptTerms}
+                onChange={(e) => setAcceptTerms(e.target.checked)}
+              />
+              <span>
+                Li e aceito os{" "}
+                <Link href="/termos" className="text-gold underline underline-offset-2">
+                  Termos de serviço
+                </Link>
+                .
+              </span>
+            </label>
+            <label className="flex items-start gap-3 text-sm text-sand">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={acceptPrivacy}
+                onChange={(e) => setAcceptPrivacy(e.target.checked)}
+              />
+              <span>
+                Autorizo o tratamento dos dados necessários conforme a{" "}
+                <Link href="/privacidade" className="text-gold underline underline-offset-2">
+                  Política de privacidade
+                </Link>{" "}
+                (LGPD). Coletamos só o essencial para a conta e o Match.
+              </span>
+            </label>
+          </fieldset>
         </div>
       </div>
       <div className="shrink-0 border-t border-line bg-paper px-5 pt-3 pb-[max(16px,env(safe-area-inset-bottom))]">
         {error && <p className="mb-2 text-sm text-gold">{error}</p>}
         <button
-          disabled={busy || (ageNumber > 0 && ageNumber < 18)}
+          disabled={busy || (ageNumber > 0 && ageNumber < 18) || !acceptAge || !acceptTerms || !acceptPrivacy}
           className="w-full rounded-2xl gold-fill py-4 text-base font-bold disabled:opacity-40"
           onClick={() => void finish()}
         >
           {busy ? "Criando conta..." : `Entrar no ${brand.mark}`}
         </button>
         <p className="mt-2 text-center text-[10px] text-muted">
-          Ao entrar você aceita os termos e a privacidade.
+          Sem consentimento não criamos a conta. Você pode pedir exclusão a qualquer momento.
         </p>
       </div>
     </div>

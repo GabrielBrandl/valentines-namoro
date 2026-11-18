@@ -10,8 +10,11 @@ import {
   useState,
 } from "react";
 import {
+  getSessionUser,
+  loadCloudReels,
   loadCloudState,
   loadDiscoverProfiles,
+  publishCloudReel,
   recordSwipe,
   saveCloudState,
   uploadMedia,
@@ -66,6 +69,7 @@ type State = Persisted & {
   pendingMatchId: string | null;
   typingId: string | null;
   liveReady: boolean;
+  cloudReels: Reel[];
 };
 
 const defaultPrefs: Prefs = {
@@ -74,6 +78,7 @@ const defaultPrefs: Prefs = {
   ageMax: 40,
   maxKm: 50,
   verifiedOnly: false,
+  city: "",
 };
 
 const emptyPersist = (): Persisted => ({
@@ -100,6 +105,7 @@ const initial: State = {
   pendingMatchId: null,
   typingId: null,
   liveReady: false,
+  cloudReels: [],
 };
 
 function profileToPerson(row: {
@@ -302,6 +308,26 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
         setState((s) => ({ ...s, liveReady: true }));
       } catch {
         if (alive) setState((s) => ({ ...s, liveReady: true }));
+      }
+      try {
+        const [cloud, user] = await Promise.all([loadCloudReels(), getSessionUser().catch(() => null)]);
+        if (!alive) return;
+        const meId = user?.id;
+        const mapped: Reel[] = cloud.map((row) => ({
+          id: row.id,
+          authorId: meId && row.user_id === meId ? "me" : row.user_id,
+          caption: row.caption || "Reel",
+          media: row.media_url,
+          poster: row.poster_url || portrait("Reel"),
+          likes: row.likes || 0,
+          liked: false,
+          comments: [],
+          at: new Date(row.created_at).getTime(),
+          mine: Boolean(meId && row.user_id === meId),
+        }));
+        setState((s) => ({ ...s, cloudReels: mapped }));
+      } catch {
+        /* feed local / seed continua */
       }
     })();
     return () => {
@@ -645,23 +671,34 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
   const publishReel = useCallback(async (file: Blob, caption: string) => {
     const id = crypto.randomUUID();
     const me = stateRef.current.me;
+    const poster = me?.photos[0] || portrait(me?.name || "Você");
+    const text = caption.trim() || "Novo reel";
     let media = `idb:reel-${id}`;
+    let cloudId = id;
+    let at = Date.now();
     try {
       media = await uploadMedia(file, "reels", file.type.includes("mp4") ? "mp4" : "webm");
+      try {
+        const row = await publishCloudReel({ caption: text, mediaUrl: media, posterUrl: poster });
+        cloudId = row.id;
+        at = new Date(row.created_at).getTime();
+      } catch {
+        /* storage ok; tabela reels pode falhar sem bloquear o feed local */
+      }
     } catch {
       await idbSet(`reel-${id}`, file);
       media = `idb:reel-${id}`;
     }
     const reel: Reel = {
-      id,
+      id: cloudId,
       authorId: "me",
-      caption: caption.trim() || "Novo reel",
+      caption: text,
       media,
-      poster: me?.photos[0] || portrait(me?.name || "Você"),
+      poster,
       likes: 0,
       liked: false,
       comments: [],
-      at: Date.now(),
+      at,
       mine: true,
     };
     setState((s) => ({ ...s, myReels: [reel, ...s.myReels] }));
@@ -678,7 +715,14 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
     msgTimes.current = [];
     localStorage.removeItem(STORAGE_KEY);
     setLivePeople([]);
-    setState({ ...emptyPersist(), ready: true, pendingMatchId: null, typingId: null, liveReady: false });
+    setState({
+      ...emptyPersist(),
+      ready: true,
+      pendingMatchId: null,
+      typingId: null,
+      liveReady: false,
+      cloudReels: [],
+    });
   }, []);
 
   const deck = useMemo(() => {
@@ -693,6 +737,8 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
         if (person.sponsored) return true;
         if (person.age < prefs.ageMin || person.age > prefs.ageMax) return false;
         if (prefs.show !== "todos" && person.gender !== prefs.show) return false;
+        const cityNeedle = (prefs.city || "").trim().toLowerCase();
+        if (cityNeedle && !person.city.toLowerCase().includes(cityNeedle)) return false;
         const km = displayDistance(person, prefs);
         if (km > (prefs.maxKm ?? 50)) return false;
         const decorated = decorate(person);
@@ -728,10 +774,25 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
         comments: [...reel.comments, ...(extra?.comments ?? [])],
       };
     });
-    return [...state.myReels, ...seeded]
-      .filter((reel) => !state.reportedReels.includes(reel.id))
+    const seen = new Set<string>();
+    const merged = [...state.myReels, ...state.cloudReels, ...seeded].filter((reel) => {
+      if (seen.has(reel.id) || state.reportedReels.includes(reel.id)) return false;
+      seen.add(reel.id);
+      return true;
+    });
+    return merged
+      .map((reel) => {
+        const extra = state.reelExtras[reel.id];
+        if (!extra) return reel;
+        return {
+          ...reel,
+          liked: Boolean(extra.liked) || reel.liked,
+          likes: reel.likes + (extra.liked && !reel.liked ? 1 : 0),
+          comments: [...reel.comments, ...(extra.comments ?? [])],
+        };
+      })
       .sort((a, b) => b.at - a.at);
-  }, [state.myReels, state.reelExtras, state.reportedReels]);
+  }, [state.myReels, state.cloudReels, state.reelExtras, state.reportedReels]);
 
   const unread = useMemo(() => {
     const msgUnread = state.messages.filter(

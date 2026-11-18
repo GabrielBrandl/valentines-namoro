@@ -46,6 +46,8 @@ export type Prefs = {
   ageMax: number;
   maxKm: number;
   verifiedOnly: boolean;
+  /** Cidade preferida no Match. Vazio = qualquer cidade. */
+  city: string;
   lat?: number;
   lng?: number;
 };

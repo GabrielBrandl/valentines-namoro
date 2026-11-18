@@ -241,14 +241,14 @@ function Slide({
           }}
         />
       ) : (
-        <Photo src={reel.poster} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        <Photo src={reel.poster} alt={`Capa do reel de ${author.name}`} className="absolute inset-0 h-full w-full object-cover" />
       )}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/35" />
       {burst && <IconHeart className="heart-pop pointer-events-none absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 text-gold" />}
 
       <div className="absolute right-3 bottom-28 z-10 flex flex-col items-center gap-5 text-white drop-shadow-lg">
         <div className="relative">
-          <Photo src={author.photo} alt="" className="h-12 w-12 rounded-full object-cover ring-2 ring-white" />
+          <Photo src={author.photo} alt={`Foto de ${author.name}`} className="h-12 w-12 rounded-full object-cover ring-2 ring-white" />
           {!isMine && (
             <button
               type="button"
@@ -308,7 +308,7 @@ function Slide({
           onClick={onToggleMute}
           aria-label={muted ? "Ativar som" : "Silenciar"}
         >
-          <Photo src={author.photo} alt="" className="h-full w-full animate-spin object-cover [animation-duration:8s]" />
+          <Photo src={author.photo} alt={`Avatar de ${author.name}`} className="h-full w-full animate-spin object-cover [animation-duration:8s]" />
         </button>
       </div>
 
