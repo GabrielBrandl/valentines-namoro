@@ -3,7 +3,11 @@ node_modules
 out
 .DS_Store
 *.log
-.env*
+.env
+.env.local
+.env*.local
+!.env.example
+!.env.production
 .vercel
 tsconfig.tsbuildinfo
 *.tsbuildinfo
