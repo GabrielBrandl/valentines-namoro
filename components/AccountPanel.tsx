@@ -12,9 +12,16 @@ import { useFecon } from "@/lib/store";
 import { Photo } from "./Media";
 
 const PRIMARY = [
-  ["/loja", "Loja"],
+  ["/shopping", "Shopping"],
+  ["/delivery", "Delivery"],
+  ["/club", "Club"],
+] as const;
+
+const SECONDARY = [
+  ["/loja", "Itens"],
   ["/planos", "Planos"],
   ["/verificar", "Verificar"],
+  ["/convites", "Convites"],
 ] as const;
 
 const HELP = [
@@ -72,6 +79,16 @@ export function AccountPanel() {
           </Link>
         ))}
       </div>
+      <div className="grid grid-cols-4 gap-2">
+        {SECONDARY.map(([href, label]) => (
+          <Link key={href} href={href} className="rounded-2xl bg-panel px-2 py-2.5 text-center text-[11px] font-semibold text-sand">
+            {label}
+          </Link>
+        ))}
+      </div>
+      <p className="text-xs text-muted">
+        Ecossistema integrado: Reels + Match + Chat + Shopping + Delivery + Club — uma conta só.
+      </p>
 
       <div className="rounded-3xl bg-panel p-4">
         <p className="text-sm font-semibold">Privacidade</p>

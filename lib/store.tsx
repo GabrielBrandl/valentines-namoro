@@ -15,6 +15,7 @@ import {
   loadCloudState,
   loadDiscoverProfiles,
   loadLikedReelIds,
+  loadProfilesByIds,
   publishCloudReel,
   recordSwipe,
   saveCloudState,
@@ -373,6 +374,17 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
           }
           return { ...s, cloudReels: mapped, reelExtras: extras };
         });
+        const authorIds = mapped.map((reel) => reel.authorId).filter((id) => id && id !== "me");
+        if (authorIds.length) {
+          const authors = await loadProfilesByIds(authorIds);
+          if (alive && authors.length) {
+            const people = authors.map(profileToPerson);
+            const prev = getLivePeople();
+            const byId = new Map(prev.map((p) => [p.id, p]));
+            for (const person of people) byId.set(person.id, person);
+            setLivePeople(Array.from(byId.values()));
+          }
+        }
       } catch {
         /* feed local / seed continua */
       }

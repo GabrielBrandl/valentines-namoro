@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Cinzel, Figtree } from "next/font/google";
 import { Shell } from "@/components/Shell";
 import { brand } from "@/lib/brand";
+import { CommerceProvider } from "@/lib/commerce";
 import { ProductProvider } from "@/lib/product";
 import { FeconProvider } from "@/lib/store";
 import "./globals.css";
@@ -53,7 +54,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={`${figtree.variable} ${cinzel.variable} antialiased`}>
         <FeconProvider>
           <ProductProvider>
-            <Shell>{children}</Shell>
+            <CommerceProvider>
+              <Shell>{children}</Shell>
+            </CommerceProvider>
           </ProductProvider>
         </FeconProvider>
       </body>

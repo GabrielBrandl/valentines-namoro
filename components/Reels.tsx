@@ -273,6 +273,10 @@ function Slide({
   const [followNote, setFollowNote] = useState(false);
   const src = useMediaSrc(reel.media);
   const poster = useMediaSrc(reel.poster);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [reel.id, src]);
   const isVideo = !/\.(jpe?g|png|webp|gif)(\?|$)/i.test(reel.media);
   const author = authorOf(reel, me);
   const product = useProduct();
@@ -341,13 +345,17 @@ function Slide({
       {burst && <IconHeart className="heart-pop pointer-events-none absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 text-gold" />}
 
       <div className="absolute right-3 bottom-28 z-10 flex flex-col items-center gap-5 text-white drop-shadow-lg">
-        <div className="relative">
-          <Photo src={author.photo} alt={`Foto de ${author.name}`} className="h-12 w-12 rounded-full object-cover ring-2 ring-white" />
+        <div className="relative h-12 w-12 shrink-0">
+          <Photo
+            src={author.photo}
+            alt={`Foto de ${author.name}`}
+            className="h-12 w-12 rounded-full object-cover ring-2 ring-white"
+          />
           {!isMine && (
             <button
               type="button"
               aria-label={following ? "Deixar de seguir" : "Seguir"}
-              className="absolute -bottom-1 left-1/2 grid h-5 w-5 -translate-x-1/2 place-items-center rounded-full gold-fill text-xs font-bold"
+              className="absolute -bottom-1 left-1/2 z-10 grid h-5 w-5 -translate-x-1/2 place-items-center rounded-full gold-fill text-[11px] font-bold leading-none text-black shadow"
               onClick={() => {
                 onFollow();
                 setFollowNote(true);
@@ -358,7 +366,7 @@ function Slide({
             </button>
           )}
           {followNote && (
-            <span className="absolute left-1/2 top-14 -translate-x-1/2 whitespace-nowrap rounded-full bg-black/80 px-2 py-0.5 text-[10px] font-semibold">
+            <span className="absolute left-1/2 top-14 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-black/80 px-2 py-0.5 text-[10px] font-semibold">
               {!following ? "Seguindo" : "Deixou de seguir"}
             </span>
           )}
@@ -400,12 +408,22 @@ function Slide({
           </button>
         )}
         <button
-          className="mt-1 grid h-11 w-11 place-items-center overflow-hidden rounded-full border-2 border-white/40"
+          className="mt-1 grid h-11 w-11 place-items-center rounded-full border-2 border-white/50 bg-black/50 text-lg"
           onClick={onToggleMute}
           aria-label={muted ? "Ativar som" : "Silenciar"}
         >
-          <Photo src={author.photo} alt={`Avatar de ${author.name}`} className="h-full w-full animate-spin object-cover [animation-duration:8s]" />
+          {muted ? "🔇" : "🔊"}
         </button>
+        {reel.productId ? (
+          <a
+            href={`/shopping?product=${encodeURIComponent(reel.productId)}`}
+            className="mt-1 grid place-items-center gap-0.5 text-[10px] font-semibold text-gold"
+            aria-label="Comprar produto do vídeo"
+          >
+            <span className="text-base leading-none">🛍</span>
+            Comprar
+          </a>
+        ) : null}
       </div>
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-4 pr-20 pb-[max(20px,env(safe-area-inset-bottom))] pt-20 text-white [text-shadow:0_1px_2px_#000]">
@@ -770,8 +788,10 @@ function formatCount(value: number) {
 
 function authorOf(reel: Reel, me: Me | null) {
   if (reel.authorId === "me") {
-    return { name: me?.name || "Você", photo: me?.photos[0] || reel.poster };
+    const mine = (me?.photos || []).find(Boolean);
+    return { name: me?.name || "Você", photo: mine || reel.poster };
   }
   const person = getPerson(reel.authorId);
-  return { name: person?.name || brand.mark, photo: person?.photos[0] || reel.poster };
+  const photo = (person?.photos || []).find(Boolean) || reel.poster;
+  return { name: person?.name || brand.mark, photo };
 }

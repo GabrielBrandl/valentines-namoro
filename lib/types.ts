@@ -101,6 +101,8 @@ export type Reel = {
   repostOf?: string;
   effect?: ReelEffect | null;
   music?: ReelMusic | null;
+  /** Produto vinculado (social commerce / TikTok Shop style) */
+  productId?: string;
 };
 
 export type HistoryItem = {

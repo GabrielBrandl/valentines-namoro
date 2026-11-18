@@ -90,16 +90,33 @@ export function Inbox({ activeId }: { activeId?: string }) {
           <>
             <div className="app-scroll mt-6 min-h-0 flex-1 space-y-3 overflow-y-auto px-4 pb-4">
               <article className="rounded-3xl border border-[#d4af37]/35 bg-panel p-5 text-sm text-sand">
-                <p className="font-semibold text-gold">Salas ao vivo em breve</p>
+                <p className="font-semibold text-gold">Salas por cidade e interesse</p>
                 <p className="mt-2">
-                  Estamos liberando o chat em grupo com gente de verdade. Por agora use Matches para conversar 1:1.
+                  Estilo Bate-Papo: salas públicas por região e tema, mais conversas privadas nos Matches. O núcleo ao vivo
+                  está no schema (`chat_rooms`) e sobe por ondas.
                 </p>
+                <div className="mt-3 space-y-2">
+                  {ROOMS.slice(0, 3).map((room) => (
+                    <button
+                      key={room.id}
+                      type="button"
+                      onClick={() => setRoomId(room.id)}
+                      className="flex w-full items-center gap-3 rounded-2xl bg-black/40 px-3 py-3 text-left"
+                    >
+                      <span className={`grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br ${room.tone}`}>{room.icon}</span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold">{room.title}</span>
+                        <span className="block truncate text-[11px] text-muted">{room.detail}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
                 <button
                   type="button"
                   className="mt-4 w-full rounded-2xl gold-fill py-3 text-sm font-bold text-black"
                   onClick={() => setTab("matches")}
                 >
-                  Ir para Matches
+                  Ir para Matches 1:1
                 </button>
               </article>
             </div>

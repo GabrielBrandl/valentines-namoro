@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { IconChat, IconClapper, IconMatch, IconUser } from "./Icons";
+import { IconBag, IconChat, IconClapper, IconMatch, IconUser } from "./Icons";
 import { AppLifecycle } from "./AppLifecycle";
 import { CookieBanner } from "./CookieBanner";
 import { InstallApp } from "./InstallApp";
@@ -11,12 +11,13 @@ import { Logo } from "./Logo";
 import { Splash } from "./Splash";
 import { useFecon } from "@/lib/store";
 
-/** Fluxo do usuário final: vídeo → match → chat → eu */
+/** Ecossistema: Social · Namoro · Chat · Shopping · Eu (Delivery/Club no perfil) */
 const nav = [
   { href: "/reels", label: "Reels", icon: IconClapper },
   { href: "/descobrir", label: "Match", icon: IconMatch },
   { href: "/matches", label: "Chat", icon: IconChat },
-  { href: "/perfil", label: "Perfil", icon: IconUser },
+  { href: "/shopping", label: "Shop", icon: IconBag },
+  { href: "/perfil", label: "Eu", icon: IconUser },
 ];
 
 const SPLASH_MS = 2400;
@@ -138,7 +139,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           {children}
         </div>
         {showNav && !hideBottom && (
-          <nav className="grid h-[calc(62px+env(safe-area-inset-bottom))] grid-cols-4 border-t border-line bg-black px-1 pt-1.5 pb-[env(safe-area-inset-bottom)] md:hidden">
+          <nav className="grid h-[calc(62px+env(safe-area-inset-bottom))] grid-cols-5 border-t border-line bg-black px-0.5 pt-1.5 pb-[env(safe-area-inset-bottom)] md:hidden">
             {nav.map((item) => {
               const active = pathname === item.href || (item.href === "/matches" && isChat);
               const Icon = item.icon;

@@ -134,3 +134,30 @@ export function IconSearch({ className = "h-6 w-6" }: { className?: string }) {
     </svg>
   );
 }
+
+export function IconBag({ className = "h-6 w-6" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+      <path d="M4 7.5h16v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-11z" />
+      <path d="M8 7.5V6a4 4 0 0 1 8 0v1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function IconBike({ className = "h-6 w-6" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+      <circle cx="6.5" cy="16.5" r="3" />
+      <circle cx="17.5" cy="16.5" r="3" />
+      <path d="M6.5 16.5 10 9h4l3.5 7.5M10 9l2 4h4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function IconClub({ className = "h-6 w-6" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+      <path d="M12 3 14.2 8.4 20 9.1l-4.2 3.8 1.2 5.7L12 15.8 6.9 18.6l1.2-5.7L3.9 9.1l5.8-.7L12 3z" strokeLinejoin="round" />
+    </svg>
+  );
+}

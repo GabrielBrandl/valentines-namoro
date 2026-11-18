@@ -267,6 +267,28 @@ export type CloudProfile = {
   photos: string[];
 };
 
+export async function loadProfilesByIds(ids: string[]): Promise<CloudProfile[]> {
+  const unique = Array.from(new Set(ids.filter(Boolean)));
+  if (!unique.length) return [];
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id,name,age,city,job,bio,gender,interests,photos")
+    .in("id", unique);
+  if (error) return [];
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    name: String(row.name || "Sem nome"),
+    age: Number(row.age) || 18,
+    city: String(row.city || "Brasil"),
+    job: String(row.job || "Em descoberta"),
+    bio: String(row.bio || ""),
+    gender: row.gender === "homem" ? "homem" : "mulher",
+    interests: Array.isArray(row.interests) ? (row.interests as string[]) : [],
+    photos: Array.isArray(row.photos) ? (row.photos as string[]).filter(Boolean) : [],
+  }));
+}
+
 export async function loadDiscoverProfiles(excludeIds: string[] = []): Promise<CloudProfile[]> {
   const supabase = createClient();
   const { data: auth } = await supabase.auth.getUser();

@@ -17,6 +17,7 @@ export function useMediaSrc(src?: string) {
       setUrl(src);
       return;
     }
+    setUrl("");
     resolve(src).then((next) => {
       if (alive) setUrl(next);
     });
@@ -41,14 +42,20 @@ export function Photo({
 }) {
   const url = useMediaSrc(src);
   const [failed, setFailed] = useState(false);
+  const letter = (alt.replace(/^Foto de\s+/i, "").trim().slice(0, 1) || "V").toUpperCase();
+
+  useEffect(() => {
+    setFailed(false);
+  }, [url, src]);
 
   if (!url || failed) {
     return (
       <div
-        className={`grid place-items-center bg-gradient-to-br from-coral to-[#3a1630] text-4xl font-serif text-white ${className ?? ""}`}
+        className={`grid place-items-center overflow-hidden bg-gradient-to-br from-[#9d2348] to-[#3a1630] font-serif font-bold text-white ${className ?? ""}`}
         style={style}
+        aria-label={alt}
       >
-        {alt.slice(0, 1)}
+        <span className="select-none text-[length:max(0.85rem,45%)] leading-none">{letter}</span>
       </div>
     );
   }
