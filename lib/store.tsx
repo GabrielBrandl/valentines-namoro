@@ -32,7 +32,6 @@ import {
   PEOPLE,
   portrait,
   setLivePeople,
-  SEED_REELS,
 } from "./seed";
 import type { Person } from "./types";
 import type {
