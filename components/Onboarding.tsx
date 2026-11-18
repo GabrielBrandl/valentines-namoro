@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { COOKIE_EVENT, readCookieChoice } from "./CookieBanner";
 import { Photo } from "./Media";
 import { brand } from "@/lib/brand";
 import { ufFromCity } from "@/lib/brazil";
@@ -48,6 +49,7 @@ export function Onboarding() {
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [acceptPrivacy, setAcceptPrivacy] = useState(false);
   const [acceptAge, setAcceptAge] = useState(false);
+  const [cookieBannerUp, setCookieBannerUp] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -65,6 +67,13 @@ export function Onboarding() {
     return () => {
       alive = false;
     };
+  }, []);
+
+  useEffect(() => {
+    const sync = () => setCookieBannerUp(!readCookieChoice());
+    sync();
+    window.addEventListener(COOKIE_EVENT, sync);
+    return () => window.removeEventListener(COOKIE_EVENT, sync);
   }, []);
 
   const ageNumber = Number(age);
@@ -233,7 +242,7 @@ export function Onboarding() {
 
   if (mode === "home") {
     return (
-      <div className="relative mx-auto flex h-full min-h-0 max-w-md flex-col overflow-y-auto bg-[#050505]">
+      <div className="relative mx-auto flex h-full min-h-0 max-w-md flex-col overflow-hidden bg-[#050505]">
         <div
           className="pointer-events-none absolute inset-0"
           style={{
@@ -241,20 +250,29 @@ export function Onboarding() {
               "radial-gradient(ellipse 80% 55% at 50% 28%, rgba(212,175,55,0.22) 0%, rgba(166,124,0,0.08) 38%, transparent 68%), linear-gradient(180deg, #0a0a0a 0%, #050505 45%, #000 100%)",
           }}
         />
-        <div className="relative z-10 flex min-h-full flex-col px-8 pb-[max(24px,env(safe-area-inset-bottom))] pt-[max(36px,env(safe-area-inset-top))]">
-          <div className="mt-auto mb-10 flex flex-col items-center text-center">
+        <div
+          className="relative z-10 flex h-full min-h-0 flex-col px-8 pt-[max(28px,env(safe-area-inset-top))]"
+          style={{
+            paddingBottom: cookieBannerUp
+              ? "max(11.5rem, calc(10.25rem + env(safe-area-inset-bottom)))"
+              : "max(24px, env(safe-area-inset-bottom))",
+          }}
+        >
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center text-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/splash-logo.png"
               alt={brand.name}
-              className="h-auto w-[min(68vw,248px)] object-contain drop-shadow-[0_12px_40px_rgba(212,175,55,0.45)]"
+              className={`h-auto object-contain drop-shadow-[0_12px_40px_rgba(212,175,55,0.45)] ${
+                cookieBannerUp ? "w-[min(54vw,200px)]" : "w-[min(68vw,248px)]"
+              }`}
             />
-            <p className="mt-5 max-w-[280px] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#d4af37]">
+            <p className="mt-4 max-w-[280px] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#d4af37]">
               {brand.tagline}
             </p>
           </div>
-          {error && <p className="mb-3 text-center text-sm text-gold">{error}</p>}
-          <div className="flex flex-col gap-3">
+          {error && <p className="mb-3 shrink-0 text-center text-sm text-gold">{error}</p>}
+          <div className="flex shrink-0 flex-col gap-2.5">
             <p className="text-center text-[11px] leading-relaxed text-muted">
               Ao continuar você declara ter 18+ e pode revisar{" "}
               <Link href="/termos" className="text-gold underline underline-offset-2">
@@ -290,7 +308,7 @@ export function Onboarding() {
             >
               {busy ? "Entrando..." : savedName ? `Continuar como ${savedName}` : "Entrar"}
             </button>
-            <p className="mt-4 text-center text-[10px] leading-relaxed text-white/55">
+            <p className="text-center text-[10px] leading-relaxed text-white/55">
               Conta salva na nuvem. Ao continuar você aceita os{" "}
               <Link href="/termos" className="underline">
                 Termos
