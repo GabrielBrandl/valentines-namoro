@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Photo } from "./Media";
 import { AccountPanel } from "./AccountPanel";
@@ -8,16 +8,42 @@ import { INTERESTS } from "@/lib/seed";
 import { compressImage, idbSet } from "@/lib/idb";
 import { useProduct } from "@/lib/product";
 import { useFecon } from "@/lib/store";
+import type { Reel } from "@/lib/types";
+
+type ProfileTab = "posts" | "liked" | "reposts";
 
 export function ProfileView() {
-  const { me, updateMe, prefs, setPrefs, matches, reels, resetAll } = useFecon();
+  const { me, updateMe, prefs, setPrefs, matches, reels, reposts, resetAll, refreshCloudReels } = useFecon();
   const product = useProduct();
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState("");
+  const [tab, setTab] = useState<ProfileTab>("posts");
+
+  useEffect(() => {
+    void refreshCloudReels();
+  }, [refreshCloudReels]);
+
+  const mine = useMemo(() => reels.filter((reel) => reel.mine && !reel.repostOf), [reels]);
+  const liked = useMemo(() => reels.filter((reel) => reel.liked), [reels]);
+  const republished = useMemo(() => {
+    const byId = new Map(reels.map((reel) => [reel.id, reel]));
+    const fromFlag = reels.filter((reel) => reel.mine && reel.repostOf);
+    const fromList = reposts
+      .map((id) => byId.get(id))
+      .filter((reel): reel is Reel => Boolean(reel));
+    const seen = new Set<string>();
+    const next: Reel[] = [];
+    for (const reel of [...fromFlag, ...fromList]) {
+      if (seen.has(reel.id)) continue;
+      seen.add(reel.id);
+      next.push(reel);
+    }
+    return next;
+  }, [reels, reposts]);
+  const grid = tab === "posts" ? mine : tab === "liked" ? liked : republished;
 
   if (!me) return null;
-  const mine = reels.filter((reel) => reel.mine);
 
   async function addPhoto(file: File) {
     setError("");
@@ -54,8 +80,8 @@ export function ProfileView() {
 
         <div className="mt-6 grid grid-cols-3 gap-2">
           <Stat label="Matches" value={matches.length} />
-          <Stat label="Reels" value={mine.length} />
-          <Stat label="Interesses" value={me.interests.length} />
+          <Stat label="Posts" value={mine.length} />
+          <Stat label="Curtidos" value={liked.length} />
         </div>
 
         <p className="mt-6 max-w-xl leading-relaxed">{me.bio}</p>
@@ -196,15 +222,47 @@ export function ProfileView() {
         </div>
 
         <div className="mt-8">
-          <h2 className="font-serif text-2xl tracking-tight">Seus reels</h2>
-          {mine.length === 0 ? (
-            <p className="mt-2 text-sm text-muted">Quando você publicar, eles ficam aqui.</p>
+          <div className="grid grid-cols-3 border-b border-line text-center text-sm font-semibold">
+            {(
+              [
+                ["posts", "Posts", mine.length],
+                ["liked", "Curtidos", liked.length],
+                ["reposts", "Reposts", republished.length],
+              ] as const
+            ).map(([id, label, count]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setTab(id)}
+                className={`relative py-3 ${tab === id ? "text-gold" : "text-muted"}`}
+              >
+                {label}
+                <span className="ml-1 text-xs opacity-70">{count}</span>
+                {tab === id && <span className="absolute inset-x-6 -bottom-px h-0.5 rounded-full gold-fill" />}
+              </button>
+            ))}
+          </div>
+          {grid.length === 0 ? (
+            <p className="mt-4 text-sm text-muted">
+              {tab === "posts"
+                ? "Quando você publicar, seus vídeos aparecem aqui."
+                : tab === "liked"
+                  ? "Os reels que você curtir ficam nesta aba."
+                  : "Republicações suas aparecem aqui."}
+            </p>
           ) : (
-            <div className="mt-3 grid grid-cols-3 gap-2">
-              {mine.map((reel) => (
-                <button key={reel.id} onClick={() => router.push(`/reels?v=${reel.id}`)} className="text-left">
-                  <Photo src={reel.poster} alt={`Capa do reel: ${reel.caption}`} className="aspect-[3/4] w-full rounded-2xl object-cover" />
-                  <span className="mt-1 line-clamp-2 block text-xs text-muted">{reel.caption}</span>
+            <div className="mt-3 grid grid-cols-3 gap-1">
+              {grid.map((reel) => (
+                <button
+                  key={reel.id}
+                  onClick={() => router.push(`/reels?v=${reel.id}`)}
+                  className="relative aspect-[3/4] overflow-hidden bg-black text-left"
+                >
+                  <Photo src={reel.poster || reel.media} alt={`Capa do reel: ${reel.caption}`} className="h-full w-full object-cover" />
+                  <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-1.5 pb-1.5 pt-6 text-[10px] text-white">
+                    ♥ {reel.likes}
+                    {reel.repostOf ? " · ↻" : ""}
+                  </span>
                 </button>
               ))}
             </div>

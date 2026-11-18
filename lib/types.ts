@@ -74,6 +74,17 @@ export type Comment = {
   at: number;
 };
 
+export type ReelEffect = {
+  filter: string;
+  speed: number;
+};
+
+export type ReelMusic = {
+  id: string;
+  title: string;
+  artist: string;
+};
+
 export type Reel = {
   id: string;
   authorId: string;
@@ -85,6 +96,11 @@ export type Reel = {
   comments: Comment[];
   at: number;
   mine?: boolean;
+  hashtags?: string[];
+  shares?: number;
+  repostOf?: string;
+  effect?: ReelEffect | null;
+  music?: ReelMusic | null;
 };
 
 export type HistoryItem = {
@@ -96,4 +112,5 @@ export type HistoryItem = {
 export type ReelExtra = {
   liked?: boolean;
   comments?: Comment[];
+  shares?: number;
 };

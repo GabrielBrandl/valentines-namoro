@@ -14,9 +14,11 @@ import {
   loadCloudReels,
   loadCloudState,
   loadDiscoverProfiles,
+  loadLikedReelIds,
   publishCloudReel,
   recordSwipe,
   saveCloudState,
+  toggleCloudReelLike,
   uploadMedia,
   upsertProfile,
   type CloudPersisted,
@@ -41,8 +43,17 @@ import type {
   Message,
   Prefs,
   Reel,
+  ReelEffect,
   ReelExtra,
+  ReelMusic,
 } from "./types";
+import {
+  capturePosterFrame,
+  ensureHashtagsInCaption,
+  extractHashtags,
+  videoContentType,
+  videoExtFromFile,
+} from "./video";
 
 const STORAGE_KEY = "fecon-v1";
 
@@ -62,6 +73,7 @@ type Persisted = {
   lastRead: Record<string, number>;
   following: string[];
   reportedReels: string[];
+  reposts: string[];
 };
 
 type State = Persisted & {
@@ -97,6 +109,7 @@ const emptyPersist = (): Persisted => ({
   lastRead: {},
   following: [],
   reportedReels: [],
+  reposts: [],
 });
 
 const initial: State = {
@@ -160,8 +173,19 @@ type Store = State & {
   toggleFollow: (authorId: string) => void;
   reportReel: (reelId: string) => void;
   addComment: (reelId: string, text: string) => void;
-  publishReel: (file: Blob, caption: string) => Promise<void>;
+  publishReel: (
+    file: Blob,
+    caption: string,
+    meta?: {
+      hashtags?: string[];
+      effect?: ReelEffect | null;
+      music?: ReelMusic | null;
+    },
+  ) => Promise<void>;
+  repostReel: (reelId: string) => Promise<void>;
+  shareReel: (reelId: string) => Promise<string>;
   deleteReel: (reelId: string) => void;
+  refreshCloudReels: () => Promise<void>;
   resetAll: () => void;
   resolve: (src: string) => Promise<string>;
   deck: ReturnType<typeof PEOPLE.filter>;
@@ -189,6 +213,7 @@ function persistOf(state: State): Persisted {
     lastRead: state.lastRead,
     following: state.following,
     reportedReels: state.reportedReels,
+    reposts: state.reposts,
   };
 }
 
@@ -220,6 +245,7 @@ function mergeLoaded(parsed: Partial<Persisted>): Persisted {
     prefs: { ...defaultPrefs, ...(parsed.prefs ?? {}) },
     following: Array.isArray(parsed.following) ? parsed.following : [],
     reportedReels: Array.isArray(parsed.reportedReels) ? parsed.reportedReels : [],
+    reposts: Array.isArray(parsed.reposts) ? parsed.reposts : [],
     passes: Array.isArray(parsed.passes) ? parsed.passes : [],
     likes: Array.isArray(parsed.likes) ? parsed.likes : [],
     supers: Array.isArray(parsed.supers) ? parsed.supers : [],
@@ -310,9 +336,14 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
         if (alive) setState((s) => ({ ...s, liveReady: true }));
       }
       try {
-        const [cloud, user] = await Promise.all([loadCloudReels(), getSessionUser().catch(() => null)]);
+        const [cloud, user, likedIds] = await Promise.all([
+          loadCloudReels(),
+          getSessionUser().catch(() => null),
+          loadLikedReelIds().catch(() => [] as string[]),
+        ]);
         if (!alive) return;
         const meId = user?.id;
+        const likedSet = new Set(likedIds);
         const mapped: Reel[] = cloud.map((row) => ({
           id: row.id,
           authorId: meId && row.user_id === meId ? "me" : row.user_id,
@@ -320,12 +351,29 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
           media: row.media_url,
           poster: row.poster_url || portrait("Reel"),
           likes: row.likes || 0,
-          liked: false,
+          liked: likedSet.has(row.id),
           comments: [],
           at: new Date(row.created_at).getTime(),
           mine: Boolean(meId && row.user_id === meId),
+          hashtags: row.hashtags ?? extractHashtags(row.caption || ""),
+          effect: row.effect ?? null,
+          music: row.music ?? null,
+          repostOf: row.repost_of ?? undefined,
+          shares: 0,
         }));
-        setState((s) => ({ ...s, cloudReels: mapped }));
+        setState((s) => {
+          const extras = { ...s.reelExtras };
+          const likedSetLocal = new Set(likedIds);
+          for (const [id, extra] of Object.entries(extras)) {
+            if (extra?.liked && /^[0-9a-f-]{36}$/i.test(id) && !likedSetLocal.has(id)) {
+              extras[id] = { ...extra, liked: false };
+            }
+          }
+          for (const id of likedIds) {
+            extras[id] = { ...extras[id], liked: true };
+          }
+          return { ...s, cloudReels: mapped, reelExtras: extras };
+        });
       } catch {
         /* feed local / seed continua */
       }
@@ -597,26 +645,53 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const toggleLike = useCallback((reelId: string) => {
+    const current = stateRef.current;
+    const fromMine = current.myReels.find((reel) => reel.id === reelId);
+    const fromCloud = current.cloudReels.find((reel) => reel.id === reelId);
+    const fromExtra = current.reelExtras[reelId];
+    const wasLiked = Boolean(fromMine?.liked || fromCloud?.liked || fromExtra?.liked);
+    const nextLiked = !wasLiked;
+
     setState((s) => {
       if (s.myReels.some((reel) => reel.id === reelId)) {
         return {
           ...s,
           myReels: s.myReels.map((reel) =>
             reel.id === reelId
-              ? { ...reel, liked: !reel.liked, likes: reel.likes + (reel.liked ? -1 : 1) }
+              ? { ...reel, liked: nextLiked, likes: Math.max(0, reel.likes + (nextLiked ? 1 : -1)) }
               : reel,
           ),
+          cloudReels: s.cloudReels.map((reel) =>
+            reel.id === reelId
+              ? { ...reel, liked: nextLiked, likes: Math.max(0, reel.likes + (nextLiked ? 1 : -1)) }
+              : reel,
+          ),
+          reelExtras: {
+            ...s.reelExtras,
+            [reelId]: { ...s.reelExtras[reelId], liked: nextLiked },
+          },
         };
       }
-      const liked = !s.reelExtras[reelId]?.liked;
       return {
         ...s,
+        cloudReels: s.cloudReels.map((reel) =>
+          reel.id === reelId
+            ? { ...reel, liked: nextLiked, likes: Math.max(0, reel.likes + (nextLiked ? 1 : -1)) }
+            : reel,
+        ),
         reelExtras: {
           ...s.reelExtras,
-          [reelId]: { ...s.reelExtras[reelId], liked },
+          [reelId]: { ...s.reelExtras[reelId], liked: nextLiked },
         },
       };
     });
+
+    // UUID do Supabase → sincroniza curtida global
+    if (/^[0-9a-f-]{36}$/i.test(reelId)) {
+      void toggleCloudReelLike(reelId, nextLiked).catch(() => {
+        /* mantém estado local */
+      });
+    }
   }, []);
 
   const toggleFollow = useCallback((authorId: string) => {
@@ -668,40 +743,218 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const publishReel = useCallback(async (file: Blob, caption: string) => {
-    const id = crypto.randomUUID();
-    const me = stateRef.current.me;
-    const poster = me?.photos[0] || portrait(me?.name || "Você");
-    const text = caption.trim() || "Novo reel";
-    let media = `idb:reel-${id}`;
-    let cloudId = id;
-    let at = Date.now();
+  const refreshCloudReels = useCallback(async () => {
     try {
-      media = await uploadMedia(file, "reels", file.type.includes("mp4") ? "mp4" : "webm");
+      const [cloud, user, likedIds] = await Promise.all([
+        loadCloudReels(),
+        getSessionUser().catch(() => null),
+        loadLikedReelIds().catch(() => [] as string[]),
+      ]);
+      const meId = user?.id;
+      const likedSet = new Set(likedIds);
+      const mapped: Reel[] = cloud.map((row) => ({
+        id: row.id,
+        authorId: meId && row.user_id === meId ? "me" : row.user_id,
+        caption: row.caption || "Reel",
+        media: row.media_url,
+        poster: row.poster_url || portrait("Reel"),
+        likes: row.likes || 0,
+        liked: likedSet.has(row.id),
+        comments: [],
+        at: new Date(row.created_at).getTime(),
+        mine: Boolean(meId && row.user_id === meId),
+        hashtags: row.hashtags ?? extractHashtags(row.caption || ""),
+        effect: row.effect ?? null,
+        music: row.music ?? null,
+        repostOf: row.repost_of ?? undefined,
+        shares: 0,
+      }));
+      setState((s) => {
+        const extras = { ...s.reelExtras };
+        for (const [id, extra] of Object.entries(extras)) {
+          if (extra?.liked && /^[0-9a-f-]{36}$/i.test(id) && !likedSet.has(id)) {
+            extras[id] = { ...extra, liked: false };
+          }
+        }
+        for (const id of likedIds) {
+          extras[id] = { ...extras[id], liked: true };
+        }
+        return { ...s, cloudReels: mapped, reelExtras: extras };
+      });
+    } catch {
+      /* feed local */
+    }
+  }, []);
+
+  const publishReel = useCallback(
+    async (
+      file: Blob,
+      caption: string,
+      meta?: {
+        hashtags?: string[];
+        effect?: ReelEffect | null;
+        music?: ReelMusic | null;
+      },
+    ) => {
+      const id = crypto.randomUUID();
+      const me = stateRef.current.me;
+      const tags = meta?.hashtags?.length ? meta.hashtags : extractHashtags(caption);
+      const text = ensureHashtagsInCaption(caption, tags);
+      const hashtags = extractHashtags(text);
+      const effect = meta?.effect ?? null;
+      const music = meta?.music ?? { id: "original", title: "Som original", artist: me?.name || "Você" };
+      let poster = me?.photos[0] || portrait(me?.name || "Você");
+      const ext = videoExtFromFile(file as File);
+      const mime = videoContentType(file as File, ext);
+
+      let media = `idb:reel-${id}`;
+      let cloudId = id;
+      let at = Date.now();
+      let cloudOk = false;
+
       try {
-        const row = await publishCloudReel({ caption: text, mediaUrl: media, posterUrl: poster });
+        const frame = await capturePosterFrame(file);
+        if (frame) {
+          try {
+            poster = await uploadMedia(frame, "posters", "jpg", "image/jpeg");
+          } catch {
+            /* usa foto do perfil */
+          }
+        }
+        media = await uploadMedia(file, "reels", ext, mime);
+        const row = await publishCloudReel({
+          caption: text,
+          mediaUrl: media,
+          posterUrl: poster,
+          hashtags,
+          effect,
+          music,
+        });
         cloudId = row.id;
         at = new Date(row.created_at).getTime();
-      } catch {
-        /* storage ok; tabela reels pode falhar sem bloquear o feed local */
+        cloudOk = true;
+      } catch (err) {
+        await idbSet(`reel-${id}`, file);
+        media = `idb:reel-${id}`;
+        // Ainda publica localmente, mas avisa que os outros não verão
+        if (!(err instanceof Error && /login/i.test(err.message))) {
+          console.warn("publish cloud failed", err);
+        }
+        throw new Error(
+          err instanceof Error && /login/i.test(err.message)
+            ? err.message
+            : "Não consegui publicar na nuvem. Verifique a conexão e tente de novo (vídeo MP4 ajuda no celular).",
+        );
       }
-    } catch {
-      await idbSet(`reel-${id}`, file);
-      media = `idb:reel-${id}`;
-    }
-    const reel: Reel = {
-      id: cloudId,
-      authorId: "me",
-      caption: text,
-      media,
-      poster,
-      likes: 0,
-      liked: false,
-      comments: [],
-      at,
-      mine: true,
-    };
-    setState((s) => ({ ...s, myReels: [reel, ...s.myReels] }));
+
+      const reel: Reel = {
+        id: cloudId,
+        authorId: "me",
+        caption: text,
+        media,
+        poster,
+        likes: 0,
+        liked: false,
+        comments: [],
+        at,
+        mine: true,
+        hashtags,
+        effect,
+        music,
+        shares: 0,
+      };
+      setState((s) => ({ ...s, myReels: [reel, ...s.myReels.filter((item) => item.id !== cloudId)] }));
+      if (cloudOk) void refreshCloudReels();
+    },
+    [refreshCloudReels],
+  );
+
+  const repostReel = useCallback(
+    async (reelId: string) => {
+      const all = [
+        ...stateRef.current.myReels,
+        ...stateRef.current.cloudReels,
+        ...SEED_REELS,
+      ];
+      const reel = all.find((r) => r.id === reelId);
+      if (!reel) throw new Error("Reel não encontrado.");
+      if (reel.authorId === "me" && !reel.repostOf) throw new Error("Esse reel já é seu.");
+      if (stateRef.current.reposts.includes(reelId)) throw new Error("Você já republicou isso.");
+
+      const me = stateRef.current.me;
+      const caption = ensureHashtagsInCaption(`Republicado: ${reel.caption}`, extractHashtags(reel.caption));
+      let cloudId = crypto.randomUUID();
+      let at = Date.now();
+      const media = reel.media;
+      const poster = reel.poster || me?.photos[0] || portrait(me?.name || "Você");
+
+      if (media.startsWith("http")) {
+        try {
+          const row = await publishCloudReel({
+            caption,
+            mediaUrl: media,
+            posterUrl: poster.startsWith("http") ? poster : undefined,
+            hashtags: extractHashtags(caption),
+            effect: reel.effect ?? null,
+            music: reel.music ?? null,
+            repostOf: /^[0-9a-f-]{36}$/i.test(reel.id) ? reel.id : null,
+          });
+          cloudId = row.id;
+          at = new Date(row.created_at).getTime();
+        } catch (err) {
+          throw new Error(err instanceof Error ? err.message : "Falha ao republicar.");
+        }
+      }
+
+      const next: Reel = {
+        id: cloudId,
+        authorId: "me",
+        caption,
+        media,
+        poster,
+        likes: 0,
+        liked: false,
+        comments: [],
+        at,
+        mine: true,
+        hashtags: extractHashtags(caption),
+        effect: reel.effect ?? null,
+        music: reel.music ?? null,
+        repostOf: reel.id,
+        shares: 0,
+      };
+      setState((s) => ({
+        ...s,
+        myReels: [next, ...s.myReels],
+        reposts: s.reposts.includes(reelId) ? s.reposts : [reelId, ...s.reposts],
+      }));
+      void refreshCloudReels();
+    },
+    [refreshCloudReels],
+  );
+
+  const shareReel = useCallback(async (reelId: string) => {
+    const url =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/reels?v=${encodeURIComponent(reelId)}`
+        : `/reels?v=${encodeURIComponent(reelId)}`;
+    setState((s) => ({
+      ...s,
+      myReels: s.myReels.map((reel) =>
+        reel.id === reelId ? { ...reel, shares: (reel.shares || 0) + 1 } : reel,
+      ),
+      cloudReels: s.cloudReels.map((reel) =>
+        reel.id === reelId ? { ...reel, shares: (reel.shares || 0) + 1 } : reel,
+      ),
+      reelExtras: {
+        ...s.reelExtras,
+        [reelId]: {
+          ...s.reelExtras[reelId],
+          shares: (s.reelExtras[reelId]?.shares || 0) + 1,
+        },
+      },
+    }));
+    return url;
   }, []);
 
   const deleteReel = useCallback((reelId: string) => {
@@ -783,12 +1036,15 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
     return merged
       .map((reel) => {
         const extra = state.reelExtras[reel.id];
-        if (!extra) return reel;
+        const hashtags = reel.hashtags?.length ? reel.hashtags : extractHashtags(reel.caption);
+        if (!extra) return { ...reel, hashtags, shares: reel.shares || 0 };
         return {
           ...reel,
+          hashtags,
           liked: Boolean(extra.liked) || reel.liked,
           likes: reel.likes + (extra.liked && !reel.liked ? 1 : 0),
           comments: [...reel.comments, ...(extra.comments ?? [])],
+          shares: (reel.shares || 0) + (extra.shares || 0),
         };
       })
       .sort((a, b) => b.at - a.at);
@@ -829,7 +1085,10 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
     reportReel,
     addComment,
     publishReel,
+    repostReel,
+    shareReel,
     deleteReel,
+    refreshCloudReels,
     resetAll,
     resolve,
     deck,

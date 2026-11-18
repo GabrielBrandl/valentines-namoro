@@ -58,7 +58,24 @@ create table if not exists public.reels (
   media_url text not null,
   poster_url text,
   likes int not null default 0,
+  hashtags text[] not null default '{}',
+  effect jsonb,
+  music jsonb,
+  repost_of uuid references public.reels (id) on delete set null,
   created_at timestamptz not null default now()
+);
+
+-- Migração segura em bases já existentes
+alter table public.reels add column if not exists hashtags text[] not null default '{}';
+alter table public.reels add column if not exists effect jsonb;
+alter table public.reels add column if not exists music jsonb;
+alter table public.reels add column if not exists repost_of uuid;
+
+create table if not exists public.reel_likes (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  reel_id uuid not null references public.reels (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (user_id, reel_id)
 );
 
 create index if not exists profiles_gender_idx on public.profiles (gender);
@@ -66,6 +83,8 @@ create index if not exists swipes_user_idx on public.swipes (user_id);
 create index if not exists matches_user_idx on public.matches (user_id);
 create index if not exists messages_user_match_idx on public.messages (user_id, match_target_id);
 create index if not exists reels_created_idx on public.reels (created_at desc);
+create index if not exists reel_likes_reel_idx on public.reel_likes (reel_id);
+create index if not exists reel_likes_user_idx on public.reel_likes (user_id);
 
 alter table public.profiles enable row level security;
 alter table public.user_app_state enable row level security;
@@ -134,6 +153,42 @@ create policy "reels_write_own"
   on public.reels for all to authenticated
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+alter table public.reel_likes enable row level security;
+
+drop policy if exists "reel_likes_select_all" on public.reel_likes;
+create policy "reel_likes_select_all"
+  on public.reel_likes for select to authenticated
+  using (true);
+
+drop policy if exists "reel_likes_write_own" on public.reel_likes;
+create policy "reel_likes_write_own"
+  on public.reel_likes for all to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create or replace function public.bump_reel_likes()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if tg_op = 'INSERT' then
+    update public.reels set likes = likes + 1 where id = new.reel_id;
+    return new;
+  elsif tg_op = 'DELETE' then
+    update public.reels set likes = greatest(likes - 1, 0) where id = old.reel_id;
+    return old;
+  end if;
+  return null;
+end;
+$$;
+
+drop trigger if exists on_reel_like_change on public.reel_likes;
+create trigger on_reel_like_change
+  after insert or delete on public.reel_likes
+  for each row execute function public.bump_reel_likes();
 
 create or replace function public.handle_new_user()
 returns trigger

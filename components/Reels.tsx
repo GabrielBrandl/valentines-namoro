@@ -6,14 +6,32 @@ import { IconComment, IconHeart, IconPlus, IconShare, IconX } from "./Icons";
 import { getPerson } from "@/lib/seed";
 import { useProduct } from "@/lib/product";
 import { useFecon } from "@/lib/store";
-import { videoDuration } from "@/lib/video";
+import {
+  REEL_EFFECTS,
+  effectCss,
+  extractHashtags,
+  videoDuration,
+  type ReelEffectId,
+} from "@/lib/video";
 import { brand } from "@/lib/brand";
 import type { Me, Reel } from "@/lib/types";
 import { ReportDialog } from "./product-ui";
 
 export function Reels({ mode = "reels" }: { mode?: "home" | "reels" }) {
-  const { reels, me, toggleLike, addComment, publishReel, deleteReel, following, toggleFollow, reportReel } =
-    useFecon();
+  const {
+    reels,
+    me,
+    toggleLike,
+    addComment,
+    publishReel,
+    deleteReel,
+    following,
+    toggleFollow,
+    reportReel,
+    repostReel,
+    shareReel,
+    refreshCloudReels,
+  } = useFecon();
   const product = useProduct();
   const ordered = [...reels].sort(
     (a, b) => Number(product.highlighted(b.id)) - Number(product.highlighted(a.id)) || b.at - a.at,
@@ -24,6 +42,13 @@ export function Reels({ mode = "reels" }: { mode?: "home" | "reels" }) {
   const [sheet, setSheet] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [reportReelId, setReportReelId] = useState<string | null>(null);
+  const [toast, setToast] = useState("");
+
+  useEffect(() => {
+    void refreshCloudReels();
+    const timer = window.setInterval(() => void refreshCloudReels(), 45_000);
+    return () => window.clearInterval(timer);
+  }, [refreshCloudReels]);
 
   const followingFeed = ordered.filter(
     (reel) => reel.mine || following.includes(reel.authorId),
@@ -94,17 +119,53 @@ export function Reels({ mode = "reels" }: { mode?: "home" | "reels" }) {
               onComment={() => setSheet(reel.id)}
               onFollow={() => toggleFollow(reel.authorId)}
               onReport={() => setReportReelId(reel.id)}
+              onShare={async () => {
+                const url = await shareReel(reel.id);
+                try {
+                  if (navigator.share) {
+                    await navigator.share({
+                      title: brand.name,
+                      text: reel.caption,
+                      url,
+                    });
+                  } else {
+                    await navigator.clipboard.writeText(url);
+                  }
+                } catch {
+                  try {
+                    await navigator.clipboard.writeText(url);
+                  } catch {
+                    /* ignore */
+                  }
+                }
+              }}
+              onRepost={async () => {
+                try {
+                  await repostReel(reel.id);
+                  setToast("Reel republicado no seu perfil");
+                  window.setTimeout(() => setToast(""), 2200);
+                } catch (err) {
+                  window.alert(err instanceof Error ? err.message : "Não foi possível republicar.");
+                }
+              }}
             />
           ))}
         </div>
       )}
 
+      {toast ? (
+        <div className="pointer-events-none absolute inset-x-0 top-[max(52px,calc(env(safe-area-inset-top)+40px))] z-40 flex justify-center px-4">
+          <p className="rounded-full bg-black/80 px-4 py-2 text-sm font-semibold text-gold shadow-lg">{toast}</p>
+        </div>
+      ) : null}
+
       <button
-        className="absolute right-4 top-[max(12px,env(safe-area-inset-top))] z-30 grid h-10 w-10 place-items-center rounded-full gold-fill shadow-lg"
+        className="absolute right-3 bottom-[calc(72px+env(safe-area-inset-bottom))] z-30 flex items-center gap-2 rounded-full gold-fill px-4 py-3 text-sm font-bold text-black shadow-lg md:right-4 md:top-[max(12px,env(safe-area-inset-top))] md:bottom-auto md:grid md:h-11 md:w-11 md:place-items-center md:px-0 md:py-0"
         onClick={() => setPublishing(true)}
-        aria-label="Publicar"
+        aria-label="Publicar reel"
       >
         <IconPlus className="h-5 w-5" />
+        <span className="md:hidden">Publicar</span>
       </button>
 
       {sheetReel && (
@@ -130,9 +191,12 @@ export function Reels({ mode = "reels" }: { mode?: "home" | "reels" }) {
       {publishing && (
         <Publish
           onClose={() => setPublishing(false)}
-          onPublish={async (file, caption) => {
-            await publishReel(file, caption);
+          onPublish={async (file, caption, meta) => {
+            await publishReel(file, caption, meta);
             setPublishing(false);
+            setToast("Reel publicado — já aparece no feed");
+            window.setTimeout(() => setToast(""), 2400);
+            void refreshCloudReels();
           }}
         />
       )}
@@ -170,6 +234,8 @@ function Slide({
   onComment,
   onFollow,
   onReport,
+  onShare,
+  onRepost,
 }: {
   reel: Reel;
   me: Me | null;
@@ -181,12 +247,14 @@ function Slide({
   onComment: () => void;
   onFollow: () => void;
   onReport: () => void;
+  onShare: () => void;
+  onRepost: () => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const boxRef = useRef<HTMLElement>(null);
   const lastTap = useRef(0);
   const [burst, setBurst] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [shareNote, setShareNote] = useState(false);
   const [failed, setFailed] = useState(false);
   const [followNote, setFollowNote] = useState(false);
   const src = useMediaSrc(reel.media);
@@ -197,6 +265,9 @@ function Slide({
   const highlighted = product.highlighted(reel.id);
   const handle = `@${author.name.toLowerCase().replace(/\s+/g, ".")}`;
   const isMine = reel.authorId === "me";
+  const tags = reel.hashtags?.length ? reel.hashtags : extractHashtags(reel.caption);
+  const filter = effectCss(reel.effect?.filter);
+  const speed = reel.effect?.speed && reel.effect.speed > 0 ? reel.effect.speed : 1;
 
   useEffect(() => {
     const node = boxRef.current;
@@ -225,9 +296,13 @@ function Slide({
           src={src}
           poster={poster || undefined}
           className="absolute inset-0 h-full w-full object-cover"
+          style={{ filter, ...(speed !== 1 ? { animationDuration: `${speed}s` } : undefined) }}
           loop
           playsInline
           muted={muted}
+          onLoadedMetadata={(e) => {
+            e.currentTarget.playbackRate = speed;
+          }}
           onError={() => setFailed(true)}
           onClick={(event) => {
             const now = Date.now();
@@ -241,7 +316,12 @@ function Slide({
           }}
         />
       ) : (
-        <Photo src={reel.poster} alt={`Capa do reel de ${author.name}`} className="absolute inset-0 h-full w-full object-cover" />
+        <Photo
+          src={reel.poster}
+          alt={`Capa do reel de ${author.name}`}
+          className="absolute inset-0 h-full w-full object-cover"
+          style={{ filter }}
+        />
       )}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/35" />
       {burst && <IconHeart className="heart-pop pointer-events-none absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 text-gold" />}
@@ -279,20 +359,22 @@ function Slide({
         </button>
         <button
           className="grid place-items-center gap-1"
-          onClick={async () => {
-            try {
-              await navigator.clipboard.writeText(reel.caption);
-              setCopied(true);
-              window.setTimeout(() => setCopied(false), 1200);
-            } catch {
-              setCopied(true);
-            }
+          onClick={() => {
+            onShare();
+            setShareNote(true);
+            window.setTimeout(() => setShareNote(false), 1200);
           }}
           aria-label="Compartilhar"
         >
           <IconShare className="h-7 w-7" />
-          <span className="text-xs font-semibold">{copied ? "Ok" : "1,2k"}</span>
+          <span className="text-xs font-semibold">{shareNote ? "Ok" : formatCount(reel.shares || 0)}</span>
         </button>
+        {!isMine && (
+          <button className="grid place-items-center gap-1 text-[10px] font-semibold" onClick={onRepost} aria-label="Republicar">
+            <span className="text-lg leading-none">↻</span>
+            Repost
+          </button>
+        )}
         {!isMine && (
           <button
             className="grid place-items-center gap-1 text-[10px] font-semibold text-white/80"
@@ -312,18 +394,27 @@ function Slide({
         </button>
       </div>
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-4 pr-20 pb-5 pt-20 text-white [text-shadow:0_1px_2px_#000]">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-4 pr-20 pb-[max(20px,env(safe-area-inset-bottom))] pt-20 text-white [text-shadow:0_1px_2px_#000]">
         <p className="font-bold">
           {handle}
+          {reel.repostOf ? <span className="ml-2 text-[10px] font-semibold text-gold">↻ republicado</span> : null}
           {highlighted ? <span className="ml-2 rounded-full gold-fill px-2 py-0.5 text-[10px] text-black">Destaque</span> : null}
         </p>
         <p className="mt-1 text-sm leading-snug text-white/95">
-          {reel.caption} <span className="text-white/80">#valentines</span> <span className="text-white/80">#reels</span>{" "}
-          <span className="text-white/80">#conexões</span>
+          {reel.caption.replace(/#[\p{L}\p{N}_]+/gu, "").trim() || reel.caption}
+          {tags.map((tag) => (
+            <span key={tag} className="ml-1 text-gold">
+              {tag}
+            </span>
+          ))}
         </p>
         <p className="mt-2 flex items-center gap-1.5 text-xs text-white/85">
           <span aria-hidden>♪</span>
-          <span className="truncate">Som original - {author.name.toLowerCase().replace(/\s+/g, ".")}</span>
+          <span className="truncate">
+            {reel.music
+              ? `${reel.music.title} — ${reel.music.artist}`
+              : `Som original — ${author.name.toLowerCase().replace(/\s+/g, ".")}`}
+          </span>
         </p>
       </div>
     </article>
@@ -394,72 +485,265 @@ function Publish({
   onPublish,
 }: {
   onClose: () => void;
-  onPublish: (file: File, caption: string) => Promise<void>;
+  onPublish: (
+    file: File,
+    caption: string,
+    meta: {
+      hashtags: string[];
+      effect: { filter: string; speed: number };
+      music: { id: string; title: string; artist: string };
+    },
+  ) => Promise<void>;
 }) {
+  const [step, setStep] = useState<"media" | "edit" | "caption">("media");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState("");
   const [caption, setCaption] = useState("");
+  const [tagInput, setTagInput] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
+  const [filter, setFilter] = useState<ReelEffectId>("none");
+  const [speed, setSpeed] = useState(1);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const galleryRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+
+  function pickFile(next: File | undefined) {
+    if (!next) return;
+    if (!next.type.startsWith("video/") && !/\.(mp4|mov|m4v|webm|3gp)$/i.test(next.name)) {
+      setError("Escolha um arquivo de vídeo (MP4 ou MOV).");
+      return;
+    }
+    if (next.size > 100 * 1024 * 1024) {
+      setError("Escolha um vídeo de até 100 MB.");
+      return;
+    }
+    setError("");
+    setFile(next);
+    setPreview(URL.createObjectURL(next));
+    setStep("edit");
+  }
+
+  function addTag() {
+    const raw = tagInput.trim();
+    if (!raw) return;
+    const tag = (raw.startsWith("#") ? raw : `#${raw}`).toLowerCase().replace(/[^\p{L}\p{N}_#]/gu, "");
+    if (tag.length < 2) return;
+    setTags((prev) => (prev.includes(tag) || prev.length >= 8 ? prev : [...prev, tag]));
+    setTagInput("");
+  }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-end bg-black/70 md:place-items-center" onClick={onClose}>
-      <div className="w-full max-w-md rounded-t-3xl bg-panel p-5 shadow-2xl md:rounded-3xl" onClick={(e) => e.stopPropagation()}>
-        <h3 className="font-serif text-3xl tracking-tight gold-text">Novo reel</h3>
-        <label className="mt-4 block overflow-hidden rounded-2xl bg-black">
-          {preview ? (
-            <video src={preview} className="aspect-[9/14] w-full object-cover" muted playsInline controls />
-          ) : (
-            <span className="grid aspect-[9/14] place-items-center text-sm text-muted">Escolher vídeo</span>
+    <div className="fixed inset-0 z-50 grid place-items-end bg-black/80 md:place-items-center" onClick={onClose}>
+      <div
+        className="flex max-h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-panel shadow-2xl md:rounded-3xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 pt-4">
+          <h3 className="font-serif text-2xl tracking-tight gold-text">
+            {step === "media" ? "Novo reel" : step === "edit" ? "Efeitos" : "Publicar"}
+          </h3>
+          <button aria-label="Fechar" onClick={onClose}>
+            <IconX className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="app-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-5">
+          {step === "media" && (
+            <div className="mt-4 space-y-3">
+              <div className="grid aspect-[9/14] place-items-center rounded-2xl bg-black text-sm text-muted">
+                Toque para escolher ou filmar
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  className="rounded-2xl gold-fill py-3 text-sm font-bold text-black"
+                  onClick={() => galleryRef.current?.click()}
+                >
+                  Galeria
+                </button>
+                <button
+                  type="button"
+                  className="rounded-2xl border border-[#d4af37]/50 py-3 text-sm font-bold text-gold"
+                  onClick={() => cameraRef.current?.click()}
+                >
+                  Filmar
+                </button>
+              </div>
+              <p className="text-center text-[11px] text-muted">MP4/MOV · até 60s · até 100 MB</p>
+              <input
+                ref={galleryRef}
+                className="sr-only"
+                type="file"
+                accept="video/*,video/mp4,video/webm,video/quicktime,.mp4,.mov,.m4v,.webm"
+                onChange={(e) => pickFile(e.target.files?.[0])}
+              />
+              <input
+                ref={cameraRef}
+                className="sr-only"
+                type="file"
+                accept="video/*"
+                capture="environment"
+                onChange={(e) => pickFile(e.target.files?.[0])}
+              />
+            </div>
           )}
-          <input
-            className="sr-only"
-            type="file"
-            accept="video/mp4,video/webm,video/quicktime"
-            onChange={(e) => {
-              const next = e.target.files?.[0];
-              if (!next) return;
-              if (next.size > 80 * 1024 * 1024) {
-                setError("Escolha um vídeo de até 80 MB.");
-                return;
-              }
-              setError("");
-              setFile(next);
-              setPreview(URL.createObjectURL(next));
-            }}
-          />
-        </label>
-        <textarea
-          value={caption}
-          onChange={(e) => setCaption(e.target.value)}
-          rows={3}
-          placeholder="Escreva uma legenda"
-          className="mt-3 w-full resize-none rounded-2xl bg-black px-4 py-3 outline-none"
-        />
-        {error && <p className="mt-2 text-sm text-gold">{error}</p>}
-        <button
-          disabled={!file || busy}
-          className="mt-4 w-full rounded-2xl gold-fill py-3 font-bold disabled:opacity-40"
-          onClick={async () => {
-            if (!file) return;
-            setBusy(true);
-            setError("");
-            try {
-              const duration = await videoDuration(file);
-              if (!Number.isFinite(duration) || duration > 15) {
-                setError("O reel pode ter no máximo 15 segundos.");
-                return;
-              }
-              await onPublish(file, caption);
-            } catch {
-              setError("Não consegui ler a duração desse vídeo.");
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          {busy ? "Publicando..." : "Publicar reel"}
-        </button>
+
+          {(step === "edit" || step === "caption") && preview && (
+            <div className="mt-4 overflow-hidden rounded-2xl bg-black">
+              <video
+                key={`${filter}-${speed}`}
+                src={preview}
+                className="aspect-[9/14] w-full object-cover"
+                style={{ filter: effectCss(filter) }}
+                muted
+                playsInline
+                controls
+                onLoadedMetadata={(e) => {
+                  e.currentTarget.playbackRate = speed;
+                }}
+              />
+            </div>
+          )}
+
+          {step === "edit" && (
+            <div className="mt-4 space-y-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted">Filtros</p>
+                <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+                  {REEL_EFFECTS.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setFilter(item.id)}
+                      className={`shrink-0 rounded-full px-3 py-2 text-xs font-semibold ${
+                        filter === item.id ? "gold-fill text-black" : "bg-black text-sand"
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted">Velocidade</p>
+                <div className="mt-2 flex gap-2">
+                  {[0.5, 1, 1.5, 2].map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setSpeed(value)}
+                      className={`rounded-full px-3 py-2 text-xs font-semibold ${
+                        speed === value ? "gold-fill text-black" : "bg-black text-sand"
+                      }`}
+                    >
+                      {value}x
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-[#d4af37]/25 bg-black/40 px-4 py-3">
+                <p className="text-sm font-semibold text-gold">♪ Música</p>
+                <p className="mt-1 text-xs text-muted">Em breve: biblioteca de sons como no TikTok/Kwai. Por agora usamos Som original.</p>
+              </div>
+              <button type="button" className="w-full rounded-2xl gold-fill py-3 font-bold text-black" onClick={() => setStep("caption")}>
+                Continuar
+              </button>
+              <button type="button" className="w-full text-sm text-muted" onClick={() => setStep("media")}>
+                Trocar vídeo
+              </button>
+            </div>
+          )}
+
+          {step === "caption" && (
+            <div className="mt-4 space-y-3">
+              <textarea
+                value={caption}
+                onChange={(e) => setCaption(e.target.value)}
+                rows={3}
+                placeholder="Escreva uma legenda..."
+                className="w-full resize-none rounded-2xl bg-black px-4 py-3 outline-none"
+              />
+              <div className="flex gap-2">
+                <input
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addTag();
+                    }
+                  }}
+                  placeholder="#hashtag"
+                  className="min-w-0 flex-1 rounded-2xl bg-black px-4 py-3 text-sm outline-none"
+                />
+                <button type="button" className="rounded-2xl bg-panel px-4 text-sm font-bold ring-1 ring-[#d4af37]/40" onClick={addTag}>
+                  + #
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {tags.map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    className="rounded-full bg-black px-3 py-1 text-xs font-semibold text-gold"
+                    onClick={() => setTags((prev) => prev.filter((item) => item !== tag))}
+                  >
+                    {tag} ×
+                  </button>
+                ))}
+              </div>
+              <button type="button" className="text-sm text-muted" onClick={() => setStep("edit")}>
+                Voltar aos efeitos
+              </button>
+            </div>
+          )}
+
+          {error && <p className="mt-3 text-sm text-gold">{error}</p>}
+        </div>
+
+        {step === "caption" && (
+          <div className="border-t border-line px-5 py-4 pb-[max(16px,env(safe-area-inset-bottom))]">
+            <button
+              disabled={!file || busy}
+              className="w-full rounded-2xl gold-fill py-3 font-bold text-black disabled:opacity-40"
+              onClick={async () => {
+                if (!file) return;
+                setBusy(true);
+                setError("");
+                try {
+                  let duration = 0;
+                  try {
+                    duration = await videoDuration(file);
+                  } catch {
+                    // Em alguns celulares a duração falha; seguimos com aviso leve
+                    duration = 1;
+                  }
+                  if (!Number.isFinite(duration) || duration <= 0) {
+                    setError("Não consegui ler esse vídeo. Tente exportar em MP4.");
+                    return;
+                  }
+                  if (duration > 60) {
+                    setError("O reel pode ter no máximo 60 segundos.");
+                    return;
+                  }
+                  const mergedTags = Array.from(new Set([...tags, ...extractHashtags(caption)]));
+                  await onPublish(file, caption, {
+                    hashtags: mergedTags,
+                    effect: { filter, speed },
+                    music: { id: "original", title: "Som original", artist: "Você" },
+                  });
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : "Falha ao publicar.");
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              {busy ? "Publicando..." : "Publicar reel"}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
