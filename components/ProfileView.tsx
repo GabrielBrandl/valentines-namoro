@@ -198,7 +198,13 @@ export function ProfileView() {
           <p className="text-sm font-semibold text-gold">Sessão neste aparelho</p>
           <button
             className="w-full rounded-2xl border border-[#d4af37]/50 py-3 text-sm font-bold text-gold"
-            onClick={() => {
+            onClick={async () => {
+              try {
+                const { signOut } = await import("@/lib/cloud");
+                await signOut();
+              } catch {
+                /* segue limpando local */
+              }
               product.wipe();
               resetAll();
               router.push("/");
@@ -208,8 +214,14 @@ export function ProfileView() {
           </button>
           <button
             className="w-full rounded-2xl bg-paper py-3 text-sm font-semibold text-sand"
-            onClick={() => {
+            onClick={async () => {
               if (!window.confirm("Apagar perfil, matches e dados deste aparelho?")) return;
+              try {
+                const { signOut } = await import("@/lib/cloud");
+                await signOut();
+              } catch {
+                /* segue limpando local */
+              }
               product.wipe();
               resetAll();
               router.push("/");

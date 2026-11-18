@@ -9,6 +9,13 @@ import {
   useRef,
   useState,
 } from "react";
+import {
+  loadCloudState,
+  saveCloudState,
+  uploadMedia,
+  upsertProfile,
+  type CloudPersisted,
+} from "./cloud";
 import { idbGet, idbSet } from "./idb";
 import { notifyChatReply, notifyMatch } from "./notify";
 import { decorate, getPerson, PEOPLE, portrait, SEED_REELS } from "./seed";
@@ -86,6 +93,7 @@ type Store = State & {
   saveMe: (me: Me) => void;
   updateMe: (patch: Partial<Me>) => void;
   setPrefs: (prefs: Prefs) => void;
+  hydrateFromCloud: (payload: CloudPersisted) => void;
   pass: (id: string) => void;
   like: (id: string, superLike?: boolean) => void;
   undo: () => void;
@@ -137,6 +145,17 @@ function writePersist(data: Persisted) {
   }
 }
 
+let cloudTimer: number | null = null;
+function scheduleCloudSave(data: Persisted) {
+  if (typeof window === "undefined") return;
+  if (cloudTimer) window.clearTimeout(cloudTimer);
+  cloudTimer = window.setTimeout(() => {
+    void saveCloudState(data as CloudPersisted).catch(() => {
+      /* rede / sessão — localStorage já guardou */
+    });
+  }, 600);
+}
+
 function mergeLoaded(parsed: Partial<Persisted>): Persisted {
   const base = emptyPersist();
   return {
@@ -177,25 +196,49 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
   const hydrated = useRef(false);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as Partial<Persisted>;
-        if (parsed?.v === 1 && parsed.me) {
+    let alive = true;
+    (async () => {
+      try {
+        const cloud = await loadCloudState();
+        if (!alive) return;
+        if (cloud?.me) {
           hydrated.current = true;
           setState((s) => ({
             ...s,
-            ...mergeLoaded(parsed),
+            ...mergeLoaded(cloud),
             ready: true,
           }));
+          writePersist(mergeLoaded(cloud));
           return;
         }
+      } catch {
+        /* sem sessão / offline — cai no local */
       }
-    } catch {
-      // ignora JSON inválido e segue como primeira visita
-    }
-    hydrated.current = true;
-    setState((s) => ({ ...s, ready: true }));
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw) as Partial<Persisted>;
+          if (parsed?.v === 1 && parsed.me) {
+            hydrated.current = true;
+            if (!alive) return;
+            setState((s) => ({
+              ...s,
+              ...mergeLoaded(parsed),
+              ready: true,
+            }));
+            return;
+          }
+        }
+      } catch {
+        // ignora JSON inválido
+      }
+      if (!alive) return;
+      hydrated.current = true;
+      setState((s) => ({ ...s, ready: true }));
+    })();
+    return () => {
+      alive = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -212,7 +255,9 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
         // segue e grava o estado atual
       }
     }
-    writePersist(persistOf(state));
+    const data = persistOf(state);
+    writePersist(data);
+    if (state.me) scheduleCloudSave(data);
   }, [state]);
 
   const resolve = useCallback(async (src: string) => {
@@ -262,10 +307,26 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
     }, 900 + Math.round(Math.random() * 800));
   }, []);
 
+  const hydrateFromCloud = useCallback((payload: CloudPersisted) => {
+    hydrated.current = true;
+    const merged = mergeLoaded(payload);
+    writePersist(merged);
+    setState((s) => ({
+      ...s,
+      ...merged,
+      ready: true,
+      pendingMatchId: null,
+      typingId: null,
+    }));
+  }, []);
+
   const saveMe = useCallback((me: Me) => {
     setState((s) => {
       const next = { ...s, me };
-      writePersist(persistOf(next));
+      const data = persistOf(next);
+      writePersist(data);
+      scheduleCloudSave(data);
+      void upsertProfile(me, next.prefs).catch(() => {});
       return next;
     });
   }, []);
@@ -274,7 +335,10 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
     setState((s) => {
       if (!s.me) return s;
       const next = { ...s, me: { ...s.me, ...patch } };
-      writePersist(persistOf(next));
+      const data = persistOf(next);
+      writePersist(data);
+      scheduleCloudSave(data);
+      void upsertProfile(next.me!, next.prefs).catch(() => {});
       return next;
     });
   }, []);
@@ -282,7 +346,12 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
   const setPrefs = useCallback((prefs: Prefs) => {
     setState((s) => {
       const next = { ...s, prefs };
-      if (next.me) writePersist(persistOf(next));
+      if (next.me) {
+        const data = persistOf(next);
+        writePersist(data);
+        scheduleCloudSave(data);
+        void upsertProfile(next.me, prefs).catch(() => {});
+      }
       return next;
     });
   }, []);
@@ -496,13 +565,19 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
 
   const publishReel = useCallback(async (file: Blob, caption: string) => {
     const id = crypto.randomUUID();
-    await idbSet(`reel-${id}`, file);
     const me = stateRef.current.me;
+    let media = `idb:reel-${id}`;
+    try {
+      media = await uploadMedia(file, "reels", file.type.includes("mp4") ? "mp4" : "webm");
+    } catch {
+      await idbSet(`reel-${id}`, file);
+      media = `idb:reel-${id}`;
+    }
     const reel: Reel = {
       id,
       authorId: "me",
       caption: caption.trim() || "Novo reel",
-      media: `idb:reel-${id}`,
+      media,
       poster: me?.photos[0] || portrait(me?.name || "Você"),
       likes: 0,
       liked: false,
@@ -594,6 +669,7 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
     saveMe,
     updateMe,
     setPrefs,
+    hydrateFromCloud,
     pass,
     like,
     undo,

@@ -123,7 +123,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       )}
 
       <div className="flex min-w-0 flex-1 flex-col bg-paper">
-        <div className="min-h-0 flex-1">{children}</div>
+        <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
         {showNav && !hideBottom && (
           <nav className="grid h-[calc(62px+env(safe-area-inset-bottom))] grid-cols-4 border-t border-line bg-black px-1 pt-1.5 pb-[env(safe-area-inset-bottom)] md:hidden">
             {nav.map((item) => {

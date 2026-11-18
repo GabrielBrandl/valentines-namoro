@@ -37,6 +37,7 @@ export type Me = {
   gender: Gender;
   interests: string[];
   photos: string[];
+  email?: string;
 };
 
 export type Prefs = {
