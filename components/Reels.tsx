@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { useRouter } from "next/navigation";
 import { Photo, useMediaSrc } from "./Media";
 import { IconComment, IconHeart, IconPlus, IconShare, IconX } from "./Icons";
 import { getPerson } from "@/lib/seed";
@@ -19,6 +20,7 @@ import { ReportDialog } from "./product-ui";
 
 export function Reels({ mode: _mode = "reels" }: { mode?: "home" | "reels" }) {
   void _mode;
+  const router = useRouter();
   const {
     reels,
     me,
@@ -156,6 +158,13 @@ export function Reels({ mode: _mode = "reels" }: { mode?: "home" | "reels" }) {
                 following={following.includes(reel.authorId)}
                 onActive={setActive}
                 onToggleMute={() => setMuted((value) => !value)}
+                onOpenProfile={() => {
+                  if (reel.authorId === "me" || reel.mine) {
+                    router.push("/perfil");
+                    return;
+                  }
+                  router.push(`/perfil/${encodeURIComponent(reel.authorId)}`);
+                }}
                 onLike={() => {
                   if (!reel.liked) product.track("reel");
                   toggleLike(reel.id);
@@ -276,6 +285,7 @@ function Slide({
   following,
   onActive,
   onToggleMute,
+  onOpenProfile,
   onLike,
   onComment,
   onFollow,
@@ -289,6 +299,7 @@ function Slide({
   following: boolean;
   onActive: (id: string) => void;
   onToggleMute: () => void;
+  onOpenProfile: () => void;
   onLike: () => void;
   onComment: () => void;
   onFollow: () => void;
@@ -412,17 +423,28 @@ function Slide({
 
       <div className="absolute right-3 bottom-28 z-10 flex flex-col items-center gap-5 text-white drop-shadow-lg">
         <div className="relative h-12 w-12 shrink-0">
-          <Photo
-            src={author.photo}
-            alt={`Foto de ${author.name}`}
-            className="h-12 w-12 rounded-full object-cover ring-2 ring-white"
-          />
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenProfile();
+            }}
+            aria-label={`Abrir perfil de ${author.name}`}
+            className="block h-12 w-12 overflow-hidden rounded-full ring-2 ring-white"
+          >
+            <Photo
+              src={author.photo}
+              alt={`Foto de ${author.name}`}
+              className="h-12 w-12 rounded-full object-cover"
+            />
+          </button>
           {!isMine && (
             <button
               type="button"
               aria-label={following ? "Deixar de seguir" : "Seguir"}
               className="absolute -bottom-1 left-1/2 z-10 grid h-5 w-5 -translate-x-1/2 place-items-center rounded-full gold-fill text-[11px] font-bold leading-none text-black shadow"
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation();
                 onFollow();
                 setFollowNote(true);
                 window.setTimeout(() => setFollowNote(false), 1400);
@@ -500,7 +522,9 @@ function Slide({
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-4 pr-20 pb-[max(20px,env(safe-area-inset-bottom))] pt-20 text-white [text-shadow:0_1px_2px_#000]">
         <p className="font-bold">
-          {handle}
+          <button type="button" className="pointer-events-auto font-bold" onClick={onOpenProfile}>
+            {handle}
+          </button>
           {reel.repostOf ? <span className="ml-2 text-[10px] font-semibold text-gold">↻ republicado</span> : null}
           {highlighted ? <span className="ml-2 rounded-full gold-fill px-2 py-0.5 text-[10px] text-black">Destaque</span> : null}
         </p>

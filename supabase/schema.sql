@@ -78,6 +78,14 @@ create table if not exists public.reel_likes (
   primary key (user_id, reel_id)
 );
 
+create table if not exists public.follows (
+  follower_id uuid not null references auth.users (id) on delete cascade,
+  following_id uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (follower_id, following_id),
+  constraint follows_no_self check (follower_id <> following_id)
+);
+
 create index if not exists profiles_gender_idx on public.profiles (gender);
 create index if not exists swipes_user_idx on public.swipes (user_id);
 create index if not exists matches_user_idx on public.matches (user_id);

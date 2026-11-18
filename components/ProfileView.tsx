@@ -14,15 +14,22 @@ import type { Reel } from "@/lib/types";
 type ProfileTab = "posts" | "liked" | "reposts";
 
 export function ProfileView() {
-  const { me, updateMe, prefs, setPrefs, matches, reels, reposts, resetAll, refreshCloudReels } = useFecon();
+  const { me, updateMe, prefs, setPrefs, matches, reels, reposts, following, resetAll, refreshCloudReels } = useFecon();
   const product = useProduct();
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState("");
   const [tab, setTab] = useState<ProfileTab>("posts");
+  const [followers, setFollowers] = useState(0);
 
   useEffect(() => {
     void refreshCloudReels();
+    void import("@/lib/cloud").then(async ({ getSessionUser, countFollowers }) => {
+      const user = await getSessionUser().catch(() => null);
+      if (!user?.id) return;
+      const n = await countFollowers(user.id).catch(() => 0);
+      setFollowers(n);
+    });
   }, [refreshCloudReels]);
 
   const mine = useMemo(() => reels.filter((reel) => reel.mine && !reel.repostOf), [reels]);
@@ -79,10 +86,11 @@ export function ProfileView() {
           </button>
         </div>
 
-        <div className="mt-6 grid grid-cols-3 gap-2">
-          <Stat label="Matches" value={matches.length} />
+        <div className="mt-6 grid grid-cols-4 gap-2">
           <Stat label="Posts" value={mine.length} />
-          <Stat label="Curtidos" value={liked.length} />
+          <Stat label="Seguidores" value={followers} />
+          <Stat label="Seguindo" value={following.length} />
+          <Stat label="Matches" value={matches.length} />
         </div>
 
         <p className="mt-6 max-w-xl leading-relaxed">{me.bio}</p>

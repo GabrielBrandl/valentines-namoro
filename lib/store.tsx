@@ -14,6 +14,7 @@ import {
   loadCloudReels,
   loadCloudState,
   loadDiscoverProfiles,
+  loadFollowingIds,
   loadLikedReelIds,
   loadProfilesByIds,
   publishCloudReel,
@@ -707,13 +708,19 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
 
   const toggleFollow = useCallback((authorId: string) => {
     if (!authorId || authorId === "me") return;
-    setState((s) => {
-      const on = s.following.includes(authorId);
-      return {
-        ...s,
-        following: on ? s.following.filter((id) => id !== authorId) : [...s.following, authorId],
-      };
-    });
+    const on = stateRef.current.following.includes(authorId);
+    const nextFollow = !on;
+    setState((s) => ({
+      ...s,
+      following: on ? s.following.filter((id) => id !== authorId) : [...s.following, authorId],
+    }));
+    if (/^[0-9a-f-]{36}$/i.test(authorId)) {
+      void import("@/lib/cloud")
+        .then(({ toggleCloudFollow }) => toggleCloudFollow(authorId, nextFollow))
+        .catch(() => {
+          /* mantém estado local */
+        });
+    }
   }, []);
 
   const reportReel = useCallback((reelId: string) => {
@@ -756,10 +763,11 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
 
   const refreshCloudReels = useCallback(async () => {
     try {
-      const [cloud, user, likedIds] = await Promise.all([
+      const [cloud, user, likedIds, followingIds] = await Promise.all([
         loadCloudReels(),
         getSessionUser().catch(() => null),
         loadLikedReelIds().catch(() => [] as string[]),
+        loadFollowingIds().catch(() => null),
       ]);
       const meId = user?.id;
       const likedSet = new Set(likedIds);
@@ -790,7 +798,16 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
         for (const id of likedIds) {
           extras[id] = { ...extras[id], liked: true };
         }
-        return { ...s, cloudReels: mapped, reelExtras: extras };
+        const nextFollowing =
+          followingIds == null
+            ? s.following
+            : Array.from(
+                new Set([
+                  ...s.following.filter((id) => !/^[0-9a-f-]{36}$/i.test(id)),
+                  ...followingIds,
+                ]),
+              );
+        return { ...s, cloudReels: mapped, reelExtras: extras, following: nextFollowing };
       });
     } catch {
       /* feed local */

@@ -395,3 +395,84 @@ export async function loadAdminDashboard() {
     },
   };
 }
+
+const UUID_RE = /^[0-9a-f-]{36}$/i;
+
+export async function loadCloudReelsByAuthor(authorId: string): Promise<CloudReel[]> {
+  if (!UUID_RE.test(authorId)) return [];
+  const supabase = createClient();
+  const full = await supabase
+    .from("reels")
+    .select("id,user_id,caption,media_url,poster_url,likes,created_at,hashtags,effect,music,repost_of")
+    .eq("user_id", authorId)
+    .order("created_at", { ascending: false })
+    .limit(60);
+  if (!full.error) return (full.data ?? []) as CloudReel[];
+
+  const basic = await supabase
+    .from("reels")
+    .select("id,user_id,caption,media_url,poster_url,likes,created_at")
+    .eq("user_id", authorId)
+    .order("created_at", { ascending: false })
+    .limit(60);
+  if (basic.error) return [];
+  return (basic.data ?? []) as CloudReel[];
+}
+
+export async function toggleCloudFollow(followingId: string, follow: boolean) {
+  if (!UUID_RE.test(followingId)) return;
+  const supabase = createClient();
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) throw new Error("Faça login para seguir.");
+  if (auth.user.id === followingId) return;
+
+  if (follow) {
+    const { error } = await supabase.from("follows").upsert(
+      { follower_id: auth.user.id, following_id: followingId },
+      { onConflict: "follower_id,following_id" },
+    );
+    if (error) throw new Error(error.message);
+  } else {
+    const { error } = await supabase
+      .from("follows")
+      .delete()
+      .eq("follower_id", auth.user.id)
+      .eq("following_id", followingId);
+    if (error) throw new Error(error.message);
+  }
+}
+
+/** null = tabela/consulta indisponível (mantém estado local). */
+export async function loadFollowingIds(): Promise<string[] | null> {
+  const supabase = createClient();
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return [];
+  const { data, error } = await supabase
+    .from("follows")
+    .select("following_id")
+    .eq("follower_id", auth.user.id);
+  if (error) return null;
+  return (data ?? []).map((row) => row.following_id as string);
+}
+
+export async function countFollowers(userId: string): Promise<number> {
+  if (!UUID_RE.test(userId)) return 0;
+  const supabase = createClient();
+  const { count, error } = await supabase
+    .from("follows")
+    .select("*", { count: "exact", head: true })
+    .eq("following_id", userId);
+  if (error) return 0;
+  return count ?? 0;
+}
+
+export async function countFollowing(userId: string): Promise<number> {
+  if (!UUID_RE.test(userId)) return 0;
+  const supabase = createClient();
+  const { count, error } = await supabase
+    .from("follows")
+    .select("*", { count: "exact", head: true })
+    .eq("follower_id", userId);
+  if (error) return 0;
+  return count ?? 0;
+}

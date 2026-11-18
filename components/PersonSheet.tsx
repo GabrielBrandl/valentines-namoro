@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Photo } from "./Media";
 import { IconHeart, IconStar, IconX } from "./Icons";
 import { useProduct } from "@/lib/product";
@@ -21,6 +22,7 @@ export function PersonSheet({
   onSuper: () => void;
 }) {
   const product = useProduct();
+  const router = useRouter();
   const [report, setReport] = useState(false);
   const [paywall, setPaywall] = useState(false);
   return (
@@ -29,7 +31,17 @@ export function PersonSheet({
         className="app-scroll max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-paper md:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <Photo src={person.photos[0]} alt={person.name} className="h-80 w-full object-cover" />
+        <button
+          type="button"
+          className="block w-full"
+          onClick={() => {
+            onClose();
+            router.push(`/perfil/${encodeURIComponent(person.id)}`);
+          }}
+          aria-label={`Abrir perfil social de ${person.name}`}
+        >
+          <Photo src={person.photos[0]} alt={person.name} className="h-80 w-full object-cover" />
+        </button>
         <div className="space-y-4 p-5">
           <div>
             <h3 className="font-serif text-4xl tracking-tight">
@@ -40,6 +52,16 @@ export function PersonSheet({
               {person.job} · {person.city} · {person.distanceKm} km
               {person.online ? " · online" : ""}
             </p>
+            <button
+              type="button"
+              className="mt-3 text-sm font-semibold text-gold"
+              onClick={() => {
+                onClose();
+                router.push(`/perfil/${encodeURIComponent(person.id)}`);
+              }}
+            >
+              Ver perfil · posts e seguidores
+            </button>
           </div>
           <p className="leading-relaxed">{person.bio}</p>
           <div className="flex flex-wrap gap-2">

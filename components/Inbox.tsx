@@ -403,9 +403,22 @@ export function ChatPane({ id }: { id: string }) {
         <button className="grid h-11 w-11 place-items-center text-3xl leading-none text-gold md:hidden" onClick={() => router.push("/matches")} aria-label="Voltar">
           ‹
         </button>
-        <Photo src={person.photos[0]} alt={`Foto de ${person.name}`} className="h-11 w-11 rounded-full object-cover ring-1 ring-gold/50" />
+        <button
+          type="button"
+          className="shrink-0"
+          onClick={() => router.push(`/perfil/${encodeURIComponent(person.id)}`)}
+          aria-label={`Abrir perfil de ${person.name}`}
+        >
+          <Photo src={person.photos[0]} alt={`Foto de ${person.name}`} className="h-11 w-11 rounded-full object-cover ring-1 ring-gold/50" />
+        </button>
         <div className="min-w-0 flex-1">
-          <p className="truncate font-semibold">{person.name}</p>
+          <button
+            type="button"
+            className="truncate font-semibold"
+            onClick={() => router.push(`/perfil/${encodeURIComponent(person.id)}`)}
+          >
+            {person.name}
+          </button>
           <p className={`text-xs font-semibold ${person.online ? "text-mint" : "text-muted"}`}>
             {person.online ? "Online" : "visto recentemente"}
           </p>
