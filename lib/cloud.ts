@@ -191,14 +191,14 @@ export async function loadCloudReels(): Promise<CloudReel[]> {
     .from("reels")
     .select("id,user_id,caption,media_url,poster_url,likes,created_at,hashtags,effect,music,repost_of")
     .order("created_at", { ascending: false })
-    .limit(80);
+    .limit(220);
   if (!full.error) return (full.data ?? []) as CloudReel[];
 
   const basic = await supabase
     .from("reels")
     .select("id,user_id,caption,media_url,poster_url,likes,created_at")
     .order("created_at", { ascending: false })
-    .limit(80);
+    .limit(220);
   if (basic.error) throw new Error(basic.error.message);
   return (basic.data ?? []) as CloudReel[];
 }
@@ -296,7 +296,7 @@ export async function loadDiscoverProfiles(excludeIds: string[] = []): Promise<C
     .from("profiles")
     .select("id,name,age,city,job,bio,gender,interests,photos")
     .order("updated_at", { ascending: false })
-    .limit(80);
+    .limit(400);
 
   if (auth.user) query = query.neq("id", auth.user.id);
 
