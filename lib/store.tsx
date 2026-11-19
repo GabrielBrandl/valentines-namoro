@@ -122,6 +122,47 @@ const initial: State = {
   cloudReels: [],
 };
 
+function mapCloudReel(
+  row: {
+    id: string;
+    user_id: string;
+    caption: string;
+    media_url: string;
+    poster_url: string | null;
+    likes: number;
+    created_at: string;
+    hashtags?: string[] | null;
+    effect?: ReelEffect | null;
+    music?: ReelMusic | null;
+    repost_of?: string | null;
+    comments_count?: number | null;
+    shares?: number | null;
+  },
+  meId: string | undefined,
+  likedSet: Set<string>,
+): Reel {
+  const likes = row.likes || 0;
+  const commentsCount = row.comments_count ?? Math.floor(likes * 0.05);
+  return {
+    id: row.id,
+    authorId: meId && row.user_id === meId ? "me" : row.user_id,
+    caption: row.caption || "Reel",
+    media: row.media_url,
+    poster: row.poster_url || portrait("Reel"),
+    likes,
+    liked: likedSet.has(row.id),
+    comments: [],
+    commentsCount,
+    at: new Date(row.created_at).getTime(),
+    mine: Boolean(meId && row.user_id === meId),
+    hashtags: row.hashtags ?? extractHashtags(row.caption || ""),
+    effect: row.effect ?? null,
+    music: row.music ?? null,
+    repostOf: row.repost_of ?? undefined,
+    shares: row.shares || Math.max(1, Math.floor(likes * 0.02)),
+  };
+}
+
 function profileToPerson(row: {
   id: string;
   name: string;
@@ -357,23 +398,7 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
         if (!alive) return;
         const meId = user?.id;
         const likedSet = new Set(likedIds);
-        const mapped: Reel[] = cloud.map((row) => ({
-          id: row.id,
-          authorId: meId && row.user_id === meId ? "me" : row.user_id,
-          caption: row.caption || "Reel",
-          media: row.media_url,
-          poster: row.poster_url || portrait("Reel"),
-          likes: row.likes || 0,
-          liked: likedSet.has(row.id),
-          comments: [],
-          at: new Date(row.created_at).getTime(),
-          mine: Boolean(meId && row.user_id === meId),
-          hashtags: row.hashtags ?? extractHashtags(row.caption || ""),
-          effect: row.effect ?? null,
-          music: row.music ?? null,
-          repostOf: row.repost_of ?? undefined,
-          shares: 0,
-        }));
+        const mapped: Reel[] = cloud.map((row) => mapCloudReel(row, meId, likedSet));
         setState((s) => {
           const extras = { ...s.reelExtras };
           const likedSetLocal = new Set(likedIds);
@@ -783,23 +808,7 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
       ]);
       const meId = user?.id;
       const likedSet = new Set(likedIds);
-      const mapped: Reel[] = cloud.map((row) => ({
-        id: row.id,
-        authorId: meId && row.user_id === meId ? "me" : row.user_id,
-        caption: row.caption || "Reel",
-        media: row.media_url,
-        poster: row.poster_url || portrait("Reel"),
-        likes: row.likes || 0,
-        liked: likedSet.has(row.id),
-        comments: [],
-        at: new Date(row.created_at).getTime(),
-        mine: Boolean(meId && row.user_id === meId),
-        hashtags: row.hashtags ?? extractHashtags(row.caption || ""),
-        effect: row.effect ?? null,
-        music: row.music ?? null,
-        repostOf: row.repost_of ?? undefined,
-        shares: 0,
-      }));
+      const mapped: Reel[] = cloud.map((row) => mapCloudReel(row, meId, likedSet));
       setState((s) => {
         const extras = { ...s.reelExtras };
         for (const [id, extra] of Object.entries(extras)) {
@@ -1080,12 +1089,14 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
         const extra = state.reelExtras[reel.id];
         const hashtags = reel.hashtags?.length ? reel.hashtags : extractHashtags(reel.caption);
         if (!extra) return { ...reel, hashtags, shares: reel.shares || 0 };
+        const mergedComments = [...reel.comments, ...(extra.comments ?? [])];
         return {
           ...reel,
           hashtags,
           liked: Boolean(extra.liked) || reel.liked,
           likes: reel.likes + (extra.liked && !reel.liked ? 1 : 0),
-          comments: [...reel.comments, ...(extra.comments ?? [])],
+          comments: mergedComments,
+          commentsCount: Math.max(reel.commentsCount || 0, mergedComments.length),
           shares: (reel.shares || 0) + (extra.shares || 0),
         };
       })

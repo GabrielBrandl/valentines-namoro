@@ -417,7 +417,7 @@ function Slide({
             onToggleMute();
           }}
         >
-          🔇 Toque para ativar o som
+          🔊 Toque para ouvir o som
         </button>
       ) : null}
 
@@ -465,7 +465,9 @@ function Slide({
         </button>
         <button className="grid place-items-center gap-1" onClick={onComment} aria-label="Comentar">
           <IconComment className="h-8 w-8" />
-          <span className="text-xs font-semibold">{formatCount(reel.comments.length)}</span>
+          <span className="text-xs font-semibold">
+            {formatCount(Math.max(reel.comments.length, reel.commentsCount || 0))}
+          </span>
         </button>
         <button
           className="grid place-items-center gap-1"
@@ -536,14 +538,22 @@ function Slide({
             </span>
           ))}
         </p>
-        <p className="mt-2 flex items-center gap-1.5 text-xs text-white/85">
-          <span aria-hidden>♪</span>
-          <span className="truncate">
-            {reel.music
-              ? `${reel.music.title} — ${reel.music.artist}`
-              : `Som original — ${author.name.toLowerCase().replace(/\s+/g, ".")}`}
+        <div className="mt-2 flex max-w-[85%] items-center gap-2 text-xs text-white/90">
+          <span className="grid h-6 w-6 shrink-0 animate-spin place-items-center rounded-full border border-white/40 text-[10px]" style={{ animationDuration: "3.2s" }} aria-hidden>
+            ♪
           </span>
-        </p>
+          <span className="overflow-hidden whitespace-nowrap">
+            <span className="inline-block animate-pulse">
+              {reel.music
+                ? `${reel.music.title} — ${reel.music.artist}`
+                : `Som original — ${author.name.toLowerCase().replace(/\s+/g, ".")}`}
+              {" · "}áudio em tendência
+            </span>
+          </span>
+        </div>
+        {reel.likes > 5000 ? (
+          <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-gold">Em alta agora</p>
+        ) : null}
       </div>
     </article>
   );
@@ -587,8 +597,16 @@ function Comments({
         </div>
       </div>
       <div className="app-scroll min-h-0 flex-1 space-y-3 overflow-y-auto px-4 pb-3">
-        {reel.comments.length === 0 && <p className="text-sm text-muted">Seja a primeira pessoa a comentar.</p>}
-        {reel.comments.map((comment) => (
+        {reel.comments.length === 0 && (
+          <p className="text-sm text-muted">
+            {(reel.commentsCount || 0) > 0
+              ? `${formatCount(reel.commentsCount || 0)} comentários neste vídeo — seja o próximo.`
+              : "Seja a primeira pessoa a comentar."}
+          </p>
+        )}
+        {reel.comments
+          .filter((comment) => comment.text.trim())
+          .map((comment) => (
           <div key={comment.id}>
             <p className="text-sm font-semibold">{comment.author}</p>
             <p className="text-sm text-sand">{comment.text}</p>

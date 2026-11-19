@@ -183,13 +183,15 @@ export type CloudReel = {
   effect?: { filter: string; speed: number } | null;
   music?: { id: string; title: string; artist: string } | null;
   repost_of?: string | null;
+  comments_count?: number | null;
+  shares?: number | null;
 };
 
 export async function loadCloudReels(): Promise<CloudReel[]> {
   const supabase = createClient();
   const full = await supabase
     .from("reels")
-    .select("id,user_id,caption,media_url,poster_url,likes,created_at,hashtags,effect,music,repost_of")
+    .select("id,user_id,caption,media_url,poster_url,likes,created_at,hashtags,effect,music,repost_of,comments_count,shares")
     .order("created_at", { ascending: false })
     .limit(220);
   if (!full.error) return (full.data ?? []) as CloudReel[];
@@ -403,7 +405,7 @@ export async function loadCloudReelsByAuthor(authorId: string): Promise<CloudRee
   const supabase = createClient();
   const full = await supabase
     .from("reels")
-    .select("id,user_id,caption,media_url,poster_url,likes,created_at,hashtags,effect,music,repost_of")
+    .select("id,user_id,caption,media_url,poster_url,likes,created_at,hashtags,effect,music,repost_of,comments_count,shares")
     .eq("user_id", authorId)
     .order("created_at", { ascending: false })
     .limit(60);

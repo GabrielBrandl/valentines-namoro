@@ -58,6 +58,8 @@ create table if not exists public.reels (
   media_url text not null,
   poster_url text,
   likes int not null default 0,
+  comments_count int not null default 0,
+  shares int not null default 0,
   hashtags text[] not null default '{}',
   effect jsonb,
   music jsonb,

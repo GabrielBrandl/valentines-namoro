@@ -18,17 +18,19 @@ import type { Person, Reel } from "@/lib/types";
 type Tab = "posts" | "reposts";
 
 function cloudToReel(row: CloudReel, likedIds: Set<string>): Reel {
+  const likes = row.likes ?? 0;
   return {
     id: row.id,
     authorId: row.user_id,
     caption: row.caption || "",
     media: row.media_url,
     poster: row.poster_url || row.media_url,
-    likes: row.likes ?? 0,
+    likes,
     liked: likedIds.has(row.id),
     comments: [],
+    commentsCount: row.comments_count ?? Math.floor(likes * 0.05),
     at: new Date(row.created_at).getTime(),
-    shares: 0,
+    shares: row.shares ?? Math.max(1, Math.floor(likes * 0.02)),
     hashtags: row.hashtags ?? undefined,
     effect: row.effect ?? undefined,
     music: row.music ?? undefined,

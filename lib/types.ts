@@ -94,6 +94,8 @@ export type Reel = {
   likes: number;
   liked: boolean;
   comments: Comment[];
+  /** Contagem pública (quando a thread completa não veio da nuvem). */
+  commentsCount?: number;
   at: number;
   mine?: boolean;
   hashtags?: string[];
