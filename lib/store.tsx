@@ -333,6 +333,18 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
         const people = rows.map(profileToPerson);
         setLivePeople(people);
         setState((s) => ({ ...s, liveReady: true }));
+        if (people.length === 0) {
+          // tenta de novo em breve (sessão/JWT pode atrasar no 1º paint)
+          window.setTimeout(() => {
+            void loadDiscoverProfiles()
+              .then((again) => {
+                if (!again.length) return;
+                setLivePeople(again.map(profileToPerson));
+                setState((s) => ({ ...s, liveReady: true }));
+              })
+              .catch(() => {});
+          }, 1200);
+        }
       } catch {
         if (alive) setState((s) => ({ ...s, liveReady: true }));
       }
@@ -1007,26 +1019,37 @@ export function FeconProvider({ children }: { children: React.ReactNode }) {
     // Produção: só perfis reais da nuvem (sem PEOPLE/seed)
     const pool = liveReady ? getLivePeople() : [];
     const seen = new Set<string>();
-    const list = pool
-      .filter((person) => {
-        if (seen.has(person.id)) return false;
-        seen.add(person.id);
-        if (passes.includes(person.id) || likes.includes(person.id)) return false;
-        if (person.sponsored) return true;
-        if (person.age < prefs.ageMin || person.age > prefs.ageMax) return false;
-        if (prefs.show !== "todos" && person.gender !== prefs.show) return false;
-        const cityNeedle = (prefs.city || "").trim().toLowerCase();
-        if (cityNeedle && !person.city.toLowerCase().includes(cityNeedle)) return false;
-        const km = displayDistance(person, prefs);
-        if (km > (prefs.maxKm ?? 50)) return false;
-        const decorated = decorate(person);
-        if (prefs.verifiedOnly && !decorated.verified) return false;
-        return true;
-      })
-      .map((person) => {
-        const decorated = decorate(person);
-        return { ...decorated, distanceKm: displayDistance(person, prefs) };
-      });
+    const applyFilters = (strict: boolean) =>
+      pool
+        .filter((person) => {
+          if (seen.has(person.id)) return false;
+          seen.add(person.id);
+          if (passes.includes(person.id) || likes.includes(person.id)) return false;
+          if (person.sponsored) return true;
+          if (person.age < prefs.ageMin || person.age > prefs.ageMax) return false;
+          if (prefs.show !== "todos" && person.gender !== prefs.show) return false;
+          if (strict) {
+            const cityNeedle = (prefs.city || "").trim().toLowerCase();
+            if (cityNeedle && !person.city.toLowerCase().includes(cityNeedle)) return false;
+            const km = displayDistance(person, prefs);
+            if (km > (prefs.maxKm ?? 50)) return false;
+          }
+          const decorated = decorate(person);
+          if (prefs.verifiedOnly && !decorated.verified) return false;
+          return true;
+        })
+        .map((person) => {
+          const decorated = decorate(person);
+          return { ...decorated, distanceKm: displayDistance(person, prefs) };
+        });
+
+    seen.clear();
+    let list = applyFilters(true);
+    // Se filtros de cidade/km esvaziarem o deck, relaxa para ainda mostrar a crowd
+    if (list.length === 0 && pool.length > 0) {
+      seen.clear();
+      list = applyFilters(false);
+    }
     const ads = list.filter((person) => person.sponsored);
     const people = list.filter((person) => !person.sponsored);
     if (ads[0]) people.splice(Math.min(3, people.length), 0, ads[0]);

@@ -102,8 +102,9 @@ alter table public.messages enable row level security;
 alter table public.reels enable row level security;
 
 drop policy if exists "profiles_select_authenticated" on public.profiles;
-create policy "profiles_select_authenticated"
-  on public.profiles for select to authenticated
+drop policy if exists "profiles_select_public" on public.profiles;
+create policy "profiles_select_public"
+  on public.profiles for select to anon, authenticated
   using (true);
 
 drop policy if exists "profiles_insert_own" on public.profiles;
@@ -152,8 +153,9 @@ create policy "messages_own"
   with check (auth.uid() = user_id);
 
 drop policy if exists "reels_select_all" on public.reels;
-create policy "reels_select_all"
-  on public.reels for select to authenticated
+drop policy if exists "reels_select_public" on public.reels;
+create policy "reels_select_public"
+  on public.reels for select to anon, authenticated
   using (true);
 
 drop policy if exists "reels_write_own" on public.reels;
