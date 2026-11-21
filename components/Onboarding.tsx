@@ -444,10 +444,13 @@ export function Onboarding() {
             )}
             <input
               type="file"
-              accept="image/*"
+              accept="image/*,.heic,.heif"
+              capture="user"
               className="sr-only"
+              aria-label="Escolher foto de perfil"
               onChange={(e) => {
                 const next = e.target.files?.[0];
+                e.target.value = "";
                 if (!next) return;
                 setFile(next);
                 setPreview(URL.createObjectURL(next));

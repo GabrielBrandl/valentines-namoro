@@ -6,6 +6,7 @@ import { Photo } from "./Media";
 import { AccountPanel } from "./AccountPanel";
 import { InstallApp } from "./InstallApp";
 import { INTERESTS } from "@/lib/seed";
+import { uploadMedia } from "@/lib/cloud";
 import { compressImage, idbSet } from "@/lib/idb";
 import { useProduct } from "@/lib/product";
 import { useFecon } from "@/lib/store";
@@ -19,6 +20,7 @@ export function ProfileView() {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState("");
+  const [photoBusy, setPhotoBusy] = useState(false);
   const [tab, setTab] = useState<ProfileTab>("posts");
   const [followers, setFollowers] = useState(0);
 
@@ -54,14 +56,50 @@ export function ProfileView() {
   if (!me) return null;
 
   async function addPhoto(file: File) {
+    if (!file.type.startsWith("image/") && !/\.(jpe?g|png|webp|heic|heif)$/i.test(file.name)) {
+      setError("Envie uma imagem (JPG, PNG ou WEBP).");
+      return;
+    }
     setError("");
+    setPhotoBusy(true);
     try {
       const blob = await compressImage(file);
-      const key = `photo-${crypto.randomUUID()}`;
-      await idbSet(key, blob);
-      updateMe({ photos: [`idb:${key}`, ...me!.photos].slice(0, 3) });
+      let url = "";
+
+      // 1) API no servidor (usa cookie de sessão — mais confiável no mobile)
+      try {
+        const body = new FormData();
+        body.append("file", new File([blob], "avatar.jpg", { type: "image/jpeg" }));
+        const res = await fetch("/api/upload-photo", { method: "POST", body });
+        const json = (await res.json()) as { url?: string; photos?: string[]; error?: string };
+        if (res.ok && json.url) {
+          url = json.url;
+          updateMe({ photos: json.photos?.length ? json.photos : [url, ...me!.photos].slice(0, 3) });
+          setError("");
+          return;
+        }
+      } catch {
+        /* tenta caminho client */
+      }
+
+      // 2) Upload direto no client
+      try {
+        url = await uploadMedia(blob, "photos", "jpg", "image/jpeg");
+      } catch {
+        // 3) Fallback local neste aparelho
+        const key = `photo-${crypto.randomUUID()}`;
+        await idbSet(key, blob);
+        url = `idb:${key}`;
+        setError("Foto salva neste aparelho. Entre de novo na conta para sincronizar na nuvem.");
+      }
+
+      const nextPhotos = [url, ...me!.photos.filter((p) => p !== url && !p.startsWith("data:"))].slice(0, 3);
+      updateMe({ photos: nextPhotos });
+      if (url.startsWith("http")) setError("");
     } catch {
-      setError("Não consegui usar essa imagem.");
+      setError("Não consegui usar essa imagem. Tente outra foto JPG/PNG.");
+    } finally {
+      setPhotoBusy(false);
     }
   }
 
@@ -70,7 +108,29 @@ export function ProfileView() {
       <div className="mx-auto max-w-3xl">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="flex min-w-0 items-end gap-4">
-            <Photo src={me.photos[0]} alt={me.name} className="h-28 w-28 rounded-full border-2 border-[#d4af37]/70 object-cover shadow-md ring-2 ring-[#d4af37]/25" />
+            <label className="relative cursor-pointer">
+              <Photo
+                src={me.photos[0]}
+                alt={`Foto de perfil de ${me.name}`}
+                className="h-28 w-28 rounded-full border-2 border-[#d4af37]/70 object-cover shadow-md ring-2 ring-[#d4af37]/25"
+              />
+              <span className="absolute inset-x-2 bottom-2 rounded-full bg-black/70 px-2 py-1 text-center text-[10px] font-bold text-gold">
+                {photoBusy ? "Enviando…" : "Trocar"}
+              </span>
+              <input
+                type="file"
+                accept="image/*,.heic,.heif"
+                capture="user"
+                className="sr-only"
+                disabled={photoBusy}
+                aria-label="Trocar foto de perfil"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  if (file) void addPhoto(file);
+                }}
+              />
+            </label>
             <div className="min-w-0">
               <h1 className="font-serif text-4xl tracking-tight">
                 {me.name}, {me.age}
@@ -145,18 +205,23 @@ export function ProfileView() {
                 );
               })}
             </div>
-            <label className="inline-flex cursor-pointer rounded-2xl gold-fill px-4 py-2 text-sm font-bold">
-              Trocar foto
+            <label className={`inline-flex cursor-pointer rounded-2xl gold-fill px-4 py-2 text-sm font-bold ${photoBusy ? "opacity-60" : ""}`}>
+              {photoBusy ? "Enviando foto…" : "Adicionar / trocar foto"}
               <input
                 type="file"
-                accept="image/*"
+                accept="image/*,.heic,.heif"
+                capture="user"
                 className="sr-only"
+                disabled={photoBusy}
+                aria-label="Adicionar ou trocar foto de perfil"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  if (file) addPhoto(file);
+                  e.target.value = "";
+                  if (file) void addPhoto(file);
                 }}
               />
             </label>
+            <p className="text-xs text-muted">A foto sobe para a nuvem e aparece no seu perfil, nos reels e no namoro.</p>
           </form>
         )}
 
